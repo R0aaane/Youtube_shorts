@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## 0.14.0 - 2026-05-07
+
+### Changed
+
+- Replaced the food duel photo background with a simpler brown cutting-board style background.
+- Simplified arena framing and reduced grid line contrast so the battle area is the visual focus.
+- Toned down food duel UI colors for a smaller, more consistent palette.
+- Added subtle glow and shadow treatment to food sprites and ingredient allies for better separation from the background.
+- Updated food duel documentation for the simplified Shorts visual style.
+
+## 0.13.0 - 2026-05-07
+
+### Changed
+
+- Changed the food duel arena to a square layout and moved it higher on the screen.
+- Moved Pizza and Burger HP bars to the top of the video with larger text and segmented bars.
+- Changed Burger Charge trail, label, and charge impact effects from blue to Burger red.
+- Removed the old lower HP HUD so Shorts UI is less likely to cover battle information.
+
 ## 0.12.0 - 2026-05-07
 
 ### Added
