@@ -950,11 +950,19 @@ def load_food_sprite(skin: str, radius: int) -> pygame.Surface | None:
     if sprite_path is None or not sprite_path.exists():
         return None
 
-    keyed = pygame.image.load(str(sprite_path))
+    keyed = load_alpha_surface(sprite_path)
     sprite_size = round(radius * (2.95 if skin == "pizza" else 2.7))
     scaled = pygame.transform.smoothscale(keyed, (sprite_size, sprite_size))
     SPRITE_CACHE[cache_key] = scaled
     return scaled
+
+
+def load_alpha_surface(path: Path) -> pygame.Surface:
+    surface = pygame.image.load(str(path))
+    try:
+        return surface.convert_alpha()
+    except pygame.error:
+        return surface
 
 
 def load_ingredient_sprite(kind: str, radius: int) -> pygame.Surface | None:
@@ -966,7 +974,7 @@ def load_ingredient_sprite(kind: str, radius: int) -> pygame.Surface | None:
     if not sprite_path.exists():
         return None
 
-    keyed = pygame.image.load(str(sprite_path))
+    keyed = load_alpha_surface(sprite_path)
     sprite_size = round(radius * 2.45)
     scaled = pygame.transform.smoothscale(keyed, (sprite_size, sprite_size))
     SPRITE_CACHE[cache_key] = scaled
@@ -1002,22 +1010,22 @@ def burger_sprite_with_missing_ingredients(sprite: pygame.Surface, missing_ingre
     edited = sprite.copy()
     width, height = edited.get_size()
     layer_map = {
-        "lettuce": (0.48, 0.28, 0.10, (37, 50, 24, 220)),
-        "cheese": (0.56, 0.26, 0.09, (90, 58, 24, 220)),
-        "tomato": (0.61, 0.24, 0.09, (73, 28, 24, 220)),
-        "meat": (0.67, 0.30, 0.12, (42, 27, 18, 230)),
+        "lettuce": (0.48, 0.24, 0.08, (106, 174, 67, 210), (211, 245, 134, 170)),
+        "cheese": (0.56, 0.23, 0.075, (240, 177, 42, 210), (255, 231, 102, 180)),
+        "tomato": (0.61, 0.22, 0.075, (194, 64, 44, 205), (255, 128, 76, 160)),
+        "meat": (0.67, 0.25, 0.09, (122, 74, 46, 210), (214, 139, 74, 155)),
     }
     for index, kind in enumerate(missing_ingredients[-4:]):
-        y_ratio, width_ratio, height_ratio, fill = layer_map.get(kind, (0.55, 0.26, 0.1, (42, 27, 18, 220)))
+        y_ratio, width_ratio, height_ratio, fill, highlight = layer_map.get(kind, (0.55, 0.22, 0.08, (170, 112, 60, 205), (242, 190, 104, 150)))
         cut_width = round(width * max(0.18, width_ratio - index * 0.025))
         cut_height = round(height * height_ratio)
         cut = pygame.Rect(0, 0, cut_width, cut_height)
         cut.center = (round(width * (0.66 - (index % 2) * 0.07)), round(height * y_ratio))
         pygame.draw.ellipse(edited, fill, cut)
-        pygame.draw.ellipse(edited, (12, 9, 7, 120), cut, width=max(2, round(height * 0.012)))
+        pygame.draw.ellipse(edited, highlight, cut.inflate(-round(width * 0.05), -round(height * 0.025)), width=max(2, round(height * 0.01)))
         inner = cut.inflate(-round(width * 0.08), -round(height * 0.035))
         if inner.width > 0 and inner.height > 0:
-            pygame.draw.ellipse(edited, (20, 14, 10, 120), inner)
+            pygame.draw.arc(edited, highlight, inner, math.radians(180), math.radians(350), max(2, round(height * 0.011)))
 
     SPRITE_CACHE[cache_key] = edited
     return edited
@@ -1193,14 +1201,15 @@ def draw_duel_background(surface: pygame.Surface) -> pygame.Rect:
 
     arena_shadow = arena_rect.move(0, 10)
     pygame.draw.rect(cached, (13, 9, 8), arena_shadow, border_radius=10)
-    pygame.draw.rect(cached, (7, 8, 12), arena_rect, border_radius=8)
-    pygame.draw.rect(cached, (235, 226, 205), arena_rect, width=5, border_radius=8)
-    pygame.draw.rect(cached, (118, 116, 112), arena_rect.inflate(-12, -12), width=2, border_radius=6)
-    grid_color = (36, 42, 49)
-    for x in range(arena_rect.left + 80, arena_rect.right, 120):
-        pygame.draw.line(cached, grid_color, (x, arena_rect.top), (x, arena_rect.bottom), 1)
-    for y in range(arena_rect.top + 80, arena_rect.bottom, 120):
-        pygame.draw.line(cached, grid_color, (arena_rect.left, y), (arena_rect.right, y), 1)
+    pygame.draw.rect(cached, (101, 66, 39), arena_rect, border_radius=8)
+    pygame.draw.rect(cached, (139, 93, 55), arena_rect.inflate(-14, -14), border_radius=6)
+    for y in range(arena_rect.top + 44, arena_rect.bottom - 28, 72):
+        pygame.draw.line(cached, (160, 108, 66), (arena_rect.left + 22, y), (arena_rect.right - 22, y), 2)
+        pygame.draw.line(cached, (94, 59, 34), (arena_rect.left + 26, y + 3), (arena_rect.right - 26, y + 3), 1)
+    for x in range(arena_rect.left + 70, arena_rect.right - 30, 150):
+        pygame.draw.line(cached, (157, 103, 61), (x, arena_rect.top + 28), (x, arena_rect.bottom - 28), 1)
+    pygame.draw.rect(cached, (237, 219, 178), arena_rect, width=5, border_radius=8)
+    pygame.draw.rect(cached, (177, 134, 86), arena_rect.inflate(-12, -12), width=2, border_radius=6)
     draw_text_with_shadow(cached, vs_font, "VS", (WIDTH // 2, round(HEIGHT * 0.138)), (238, 229, 206), (34, 20, 14))
     DUEL_BACKGROUND_CACHE = cached
     surface.blit(DUEL_BACKGROUND_CACHE, (0, 0))

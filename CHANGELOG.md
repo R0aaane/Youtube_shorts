@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 0.15.2 - 2026-05-07
+
+### Changed
+
+- Changed food sprite loading to prefer alpha-preserving surfaces when the display backend allows it.
+- Replaced Burger's dark missing-ingredient marks with food-colored missing-filling marks.
+- Changed the food duel battle area from a black grid to a wooden tray-style board with subtle cutting-board lines.
+- Updated food duel documentation for the wooden tray arena and Burger missing-filling visuals.
+
 ## 0.15.1 - 2026-05-07
 
 ### Changed
