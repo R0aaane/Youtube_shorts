@@ -134,7 +134,8 @@ python src/generate_video.py --config configs/food_duel.json
 
 This creates a large-ball 1v1 battle where two food balls use their own skills instead of cooperating against a boss. The default matchup is Pizza Cheese vs Burger Charge+Ally.
 Pizza Cheese fires sticky cheese projectiles that attach and melt for periodic damage. Burger Charge shows a blue dash trail, spends HP to launch one realistic ingredient ally per charge, and only the charge impact triggers hit-stop.
-Ingredient allies bounce around the arena after separating instead of chasing the opponent. As Burger spends HP, its visible filling is progressively removed.
+Ingredient allies bounce around the arena after separating instead of chasing the opponent. Each ingredient keeps the HP Burger spent to create it, and deals that remaining HP as red Burger-side damage when it hits Pizza. As Burger spends HP, its visible filling is progressively removed.
+Damage colors are side-based for readability: Pizza attacks use yellow numbers and effects, while Burger and ingredient attacks use red. The result screen zooms the winning food into focus so the winner is clear at the end.
 The generated MP4 includes synthesized arcade audio: READY/FIGHT callouts, hit sounds, cheese ticks, ingredient spawns, ingredient hits, and charge impacts. The matching WAV is saved under `output/audio/`.
 The default duel config is tuned for about 20 seconds: `duration_seconds` controls total length, `duel_speed_scale` controls normal movement speed, and `duel_charge_speed` controls charge speed.
 Food duel uses realistic generated food sprites and a kitchen battle background from `assets/food_sprites/`. Collision remains circle-based internally, but the visible objects are the food sprites. Heavy hits trigger hit-stop, screen shake, and larger shockwave effects.

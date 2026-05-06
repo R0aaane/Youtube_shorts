@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## 0.12.0 - 2026-05-07
+
+### Added
+
+- Added HP to Burger ingredient allies; separated ingredients now deal their remaining HP as damage when they hit the enemy.
+- Added a winner focus result screen that zooms in on the winning food and highlights the winning side.
+
+### Changed
+
+- Unified food duel damage colors so Pizza damage is yellow and Burger/ingredient damage is red.
+- Changed the food duel arena to a shorter, wider battle area closer to the reference composition.
+- Updated the result screen to show the loser's actual remaining HP when the duel ends by time limit.
+
 ## 0.11.0 - 2026-05-07
 
 ### Changed

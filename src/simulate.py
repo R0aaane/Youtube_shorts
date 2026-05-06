@@ -141,6 +141,7 @@ class DamagePopup:
     amount: int
     position: pygame.Vector2
     frames_left: int = POPUP_FRAMES
+    color: tuple[int, int, int] = (255, 238, 96)
 
 
 @dataclass
@@ -202,6 +203,8 @@ class IngredientAlly:
     velocity: pygame.Vector2
     radius: int
     damage: int
+    hp: int
+    max_hp: int
     hit_cooldown: int = 0
     frames_left: int = 720
     visual_angle: float = 0.0
@@ -806,8 +809,12 @@ def duel_ball_by_side(side: str, left: DuelBall, right: DuelBall) -> DuelBall:
     return left if side == "left" else right
 
 
+def duel_attack_color(skin: str) -> tuple[int, int, int]:
+    return (255, 215, 70) if skin == "pizza" else (255, 76, 70)
+
+
 def duel_arena_rect() -> pygame.Rect:
-    return pygame.Rect(round(WIDTH * 0.13), round(HEIGHT * 0.245), round(WIDTH * 0.74), round(HEIGHT * 0.50))
+    return pygame.Rect(round(WIDTH * 0.08), round(HEIGHT * 0.235), round(WIDTH * 0.84), round(HEIGHT * 0.43))
 
 
 def draw_scaled_food_skin(surface: pygame.Surface, skin: str, position: tuple[int, int], radius: int) -> None:
@@ -1092,9 +1099,10 @@ def ingredient_color(kind: str) -> tuple[int, int, int]:
 
 
 def draw_ingredient_allies(surface: pygame.Surface, allies: list[IngredientAlly]) -> None:
+    hp_font = make_font(28, bold=True)
     for ally in allies:
         center = (round(ally.position.x), round(ally.position.y))
-        color = ingredient_color(ally.kind)
+        color = duel_attack_color("burger")
         sprite = load_ingredient_sprite(ally.kind, ally.radius)
         if sprite is not None:
             rotated = pygame.transform.rotozoom(sprite, -ally.visual_angle, 1.0)
@@ -1105,8 +1113,9 @@ def draw_ingredient_allies(surface: pygame.Surface, allies: list[IngredientAlly]
             surface.blit(rotated, rect)
         else:
             pygame.draw.circle(surface, (8, 12, 18), (center[0] + 4, center[1] + 6), ally.radius + 3)
-            pygame.draw.circle(surface, color, center, ally.radius)
+            pygame.draw.circle(surface, ingredient_color(ally.kind), center, ally.radius)
         pygame.draw.circle(surface, color, center, ally.radius + 8, width=4)
+        draw_text_with_shadow(surface, hp_font, str(max(0, ally.hp)), center, (255, 245, 235))
 
 
 def draw_duel_background(surface: pygame.Surface) -> pygame.Rect:
@@ -1260,10 +1269,12 @@ def update_duel_ball(
                         position=spawn_position,
                         velocity=velocity,
                         radius=max(46, round(ball.radius * 0.72)),
-                        damage=ingredient_damage,
+                        damage=paid_cost,
+                        hp=paid_cost,
+                        max_hp=paid_cost,
                     )
                 )
-                effects.append(DuelEffect("ingredient", spawn_position, 36, ingredient_color(ingredient_kind), ingredient_kind.upper()))
+                effects.append(DuelEffect("ingredient", spawn_position, 36, duel_attack_color("burger"), ingredient_kind.upper()))
                 audio_events.append(AudioEvent(frame_index, "ingredient_spawn"))
             ball.velocity = direction.normalize() * charge_speed
             ball.charge_frames = 36
@@ -1377,8 +1388,8 @@ def update_cheese_patches(
             target.hp -= dealt
             total_damage += dealt
             position = target.position + patch.offset.rotate(target.visual_angle)
-            popups.append(DamagePopup(amount=dealt, position=position))
-            effects.append(DuelEffect("cheese", position, 18, (255, 228, 82), "MELT"))
+            popups.append(DamagePopup(amount=dealt, position=position, color=duel_attack_color("pizza")))
+            effects.append(DuelEffect("cheese", position, 18, duel_attack_color("pizza"), "MELT"))
             audio_events.append(AudioEvent(frame_index, "cheese_tick"))
         if patch.frames_left > 0 and target.hp > 0:
             remaining.append(patch)
@@ -1413,15 +1424,16 @@ def update_ingredient_allies(
         ally.position.y = max(arena_rect.top + ally.radius, min(arena_rect.bottom - ally.radius, ally.position.y))
 
         if ally.hit_cooldown == 0 and ally.position.distance_to(target.position) <= target.radius + ally.radius:
-            dealt = min(target.hp, ally.damage)
+            dealt = min(target.hp, ally.hp)
             target.hp -= dealt
-            popups.append(DamagePopup(amount=dealt, position=target.position.copy()))
-            effects.append(DuelEffect("ingredient", ally.position.copy(), 24, ingredient_color(ally.kind), ally.kind.upper()))
+            ally.hp = 0
+            popups.append(DamagePopup(amount=dealt, position=target.position.copy(), color=duel_attack_color("burger")))
+            effects.append(DuelEffect("ingredient", ally.position.copy(), 24, duel_attack_color("burger"), ally.kind.upper()))
             audio_events.append(AudioEvent(frame_index, "ingredient_hit"))
             ally.hit_cooldown = 42
             total_damage += dealt
 
-        if ally.frames_left > 0 and target.hp > 0:
+        if ally.frames_left > 0 and ally.hp > 0 and target.hp > 0:
             remaining.append(ally)
     allies[:] = remaining
     return total_damage
@@ -1462,7 +1474,7 @@ def handle_duel_collision(
         left.total_damage_dealt += damage
         left.hits += 1
         left.hit_cooldown = 28
-        popups.append(DamagePopup(amount=damage, position=right.position.copy()))
+        popups.append(DamagePopup(amount=damage, position=right.position.copy(), color=duel_attack_color(left.skin)))
         hit_landed = True
         burger_charge_hit = burger_charge_hit or was_burger_charge
 
@@ -1473,20 +1485,64 @@ def handle_duel_collision(
         right.total_damage_dealt += damage
         right.hits += 1
         right.hit_cooldown = 28
-        popups.append(DamagePopup(amount=damage, position=left.position.copy()))
+        popups.append(DamagePopup(amount=damage, position=left.position.copy(), color=duel_attack_color(right.skin)))
         hit_landed = True
         burger_charge_hit = burger_charge_hit or was_burger_charge
     return hit_landed, burger_charge_hit
 
 
-def draw_duel_result(surface: pygame.Surface, winner: DuelBall, loser: DuelBall, frame_index: int, fps: int) -> None:
+def draw_duel_result(
+    surface: pygame.Surface,
+    winner: DuelBall,
+    loser: DuelBall,
+    frame_index: int,
+    fps: int,
+    result_started_frame: int | None = None,
+) -> None:
     draw_duel_background(surface)
-    headline_font = make_font(126, bold=True, italic=True)
-    result_font = make_font(56, bold=True)
-    draw_text_with_shadow(surface, headline_font, f"{winner.name} WINS", (WIDTH // 2, round(HEIGHT * 0.39)), (105, 234, 143))
-    draw_text_with_shadow(surface, result_font, f"Time {frame_index / fps:.2f}s", (WIDTH // 2, round(HEIGHT * 0.51)), (255, 245, 230))
-    draw_text_with_shadow(surface, result_font, f"Damage {winner.total_damage_dealt}  Hits {winner.hits}", (WIDTH // 2, round(HEIGHT * 0.58)), (220, 232, 255))
-    draw_text_with_shadow(surface, result_font, f"{loser.name} HP 0", (WIDTH // 2, round(HEIGHT * 0.65)), (255, 118, 118))
+    progress = 1.0
+    if result_started_frame is not None:
+        progress = max(0.0, min(1.0, (frame_index - result_started_frame) / max(1, fps * 1.2)))
+    ease = 1 - (1 - progress) * (1 - progress)
+
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, round(92 + ease * 74)))
+    surface.blit(overlay, (0, 0))
+
+    focus = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    focus_center = (WIDTH // 2, round(HEIGHT * 0.48))
+    spotlight_radius = round(winner.radius * (2.4 + ease * 1.4))
+    pygame.draw.circle(focus, (*duel_attack_color(winner.skin), 54), focus_center, spotlight_radius)
+    pygame.draw.circle(focus, (255, 255, 255, 210), focus_center, round(spotlight_radius * 0.72), width=6)
+    surface.blit(focus, (0, 0))
+
+    focus_ball = DuelBall(
+        name=winner.name,
+        skin=winner.skin,
+        color=winner.color,
+        hp=winner.hp,
+        max_hp=winner.max_hp,
+        position=pygame.Vector2(focus_center),
+        velocity=pygame.Vector2(0, 0),
+        radius=round(winner.radius * (1.3 + ease * 0.62)),
+        total_damage_dealt=winner.total_damage_dealt,
+        hits=winner.hits,
+        visual_angle=winner.visual_angle + progress * 10,
+    )
+    draw_duel_ball(surface, focus_ball, make_font(max(58, round(focus_ball.radius * 0.38)), bold=True))
+
+    headline_font = make_font(118, bold=True, italic=True)
+    result_font = make_font(50, bold=True)
+    draw_text_with_shadow(surface, headline_font, f"{winner.name} WINS", (WIDTH // 2, round(HEIGHT * 0.24)), duel_attack_color(winner.skin))
+    draw_text_with_shadow(surface, result_font, "THIS FOOD WINS", (WIDTH // 2, round(HEIGHT * 0.68)), (255, 245, 230))
+    draw_text_with_shadow(surface, result_font, f"Damage {winner.total_damage_dealt}  Hits {winner.hits}", (WIDTH // 2, round(HEIGHT * 0.74)), (220, 232, 255))
+    draw_text_with_shadow(
+        surface,
+        make_font(40, bold=True),
+        f"{loser.name} HP {max(0, loser.hp)}",
+        (WIDTH // 2, round(HEIGHT * 0.80)),
+        duel_attack_color(loser.skin),
+    )
 
 
 def run_food_duel(
@@ -1662,7 +1718,7 @@ def run_food_duel(
                 for popup in popups:
                     progress = 1 - (popup.frames_left / POPUP_FRAMES)
                     center = (round(popup.position.x), round(popup.position.y - progress * 88))
-                    draw_text_with_shadow(render_surface, popup_font, f"-{popup.amount}", center, (255, 238, 96))
+                    draw_text_with_shadow(render_surface, popup_font, f"-{popup.amount}", center, popup.color)
                     popup.frames_left -= 1
                 popups = [popup for popup in popups if popup.frames_left > 0]
                 for effect in duel_effects:
@@ -1670,11 +1726,11 @@ def run_food_duel(
                 duel_effects = [effect for effect in duel_effects if effect.frames_left > 0]
                 draw_duel_hud(render_surface, left, right, frame_index, frame_count)
             else:
-                draw_duel_result(render_surface, winner, loser or left, frame_index, fps)
+                draw_duel_result(render_surface, winner, loser or left, frame_index, fps, result_started_frame)
         else:
             if result_started_frame is None:
                 result_started_frame = frame_index
-            draw_duel_result(render_surface, winner, loser or left, frame_index, fps)
+            draw_duel_result(render_surface, winner, loser or left, frame_index, fps, result_started_frame)
 
         if shake_frames > 0 and winner is None:
             frame_copy = render_surface.copy()
