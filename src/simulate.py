@@ -32,6 +32,7 @@ HIT_COOLDOWN_FRAMES = 5
 ITEM_RADIUS = 28
 ITEM_START_FRAME = 45
 EFFECT_FRAMES = 26
+POPUP_FRAMES = 42
 MAX_ITEMS = 8
 MAX_BALL_SPEED = 1800
 CLEAR = "CLEAR"
@@ -97,6 +98,13 @@ class Effect:
     frames_left: int = EFFECT_FRAMES
 
 
+@dataclass
+class DamagePopup:
+    amount: int
+    position: pygame.Vector2
+    frames_left: int = POPUP_FRAMES
+
+
 def update_layout(width: int, height: int) -> None:
     global WIDTH, HEIGHT, BOSS_RECT, HP_BAR_RECT
     WIDTH = width
@@ -104,7 +112,7 @@ def update_layout(width: int, height: int) -> None:
     boss_width = round(width * 0.52)
     boss_height = round(height * 0.094)
     BOSS_RECT = pygame.Rect((width - boss_width) // 2, round(height * 0.125), boss_width, boss_height)
-    HP_BAR_RECT = pygame.Rect(round(width * 0.074), round(height * 0.033), round(width * 0.852), round(height * 0.022))
+    HP_BAR_RECT = pygame.Rect(round(width * 0.055), round(height * 0.03), round(width * 0.89), round(height * 0.04))
 
 
 def ensure_default_config(path: Path = DEFAULT_CONFIG_PATH) -> Path:
@@ -166,6 +174,30 @@ def clear_frames_dir() -> None:
         frame_path.unlink(missing_ok=True)
 
 
+def create_background() -> pygame.Surface:
+    background = pygame.Surface((WIDTH, HEIGHT))
+    top = pygame.Color(8, 12, 24)
+    bottom = pygame.Color(24, 31, 48)
+    band_height = 12
+
+    for y in range(0, HEIGHT, band_height):
+        ratio = y / max(1, HEIGHT - band_height)
+        color = top.lerp(bottom, ratio)
+        pygame.draw.rect(background, color, pygame.Rect(0, y, WIDTH, band_height))
+
+    minor_color = (42, 54, 78)
+    major_color = (64, 84, 116)
+    for x in range(0, WIDTH, 90):
+        color = major_color if x % 270 == 0 else minor_color
+        pygame.draw.line(background, color, (x, 0), (x, HEIGHT), 1)
+    for y in range(0, HEIGHT, 90):
+        color = major_color if y % 270 == 0 else minor_color
+        pygame.draw.line(background, color, (0, y), (WIDTH, y), 1)
+
+    pygame.draw.circle(background, (34, 48, 74), (WIDTH // 2, round(HEIGHT * 0.55)), round(WIDTH * 0.56), width=3)
+    return background
+
+
 def circle_rect_collision(position: pymunk.Vec2d, radius: int, rect: pygame.Rect) -> tuple[bool, pygame.Vector2]:
     closest_x = max(rect.left, min(position.x, rect.right))
     closest_y = max(rect.top, min(position.y, rect.bottom))
@@ -187,11 +219,11 @@ def handle_boss_collision(
     ball: BallState,
     boss_hp: int,
     total_damage: int,
-) -> tuple[int, int]:
+) -> tuple[int, int, int]:
     collided, normal = circle_rect_collision(ball.body.position, BALL_RADIUS, BOSS_RECT)
     if not collided:
         ball.hit_cooldown = max(0, ball.hit_cooldown - 1)
-        return boss_hp, total_damage
+        return boss_hp, total_damage, 0
 
     velocity = pygame.Vector2(ball.body.velocity.x, ball.body.velocity.y)
     if velocity.dot(normal) < 0:
@@ -201,14 +233,14 @@ def handle_boss_collision(
     ball.body.position = ball.body.position.x + normal.x * 8, ball.body.position.y + normal.y * 8
     if ball.hit_cooldown > 0:
         ball.hit_cooldown -= 1
-        return boss_hp, total_damage
+        return boss_hp, total_damage, 0
 
     ball.hit_cooldown = HIT_COOLDOWN_FRAMES
     dealt = min(boss_hp, ball.damage)
     ball.hits += 1
     ball.total_damage_dealt += dealt
     ball.max_hit_damage = max(ball.max_hit_damage, dealt)
-    return max(0, boss_hp - dealt), total_damage + dealt
+    return max(0, boss_hp - dealt), total_damage + dealt, dealt
 
 
 def clamp_to_arena(position: pygame.Vector2) -> pygame.Vector2:
@@ -285,6 +317,18 @@ def draw_text(surface: pygame.Surface, font: pygame.font.Font, text: str, center
     surface.blit(text_surface, text_rect)
 
 
+def draw_text_with_shadow(
+    surface: pygame.Surface,
+    font: pygame.font.Font,
+    text: str,
+    center: tuple[int, int],
+    color: tuple[int, int, int],
+    shadow: tuple[int, int, int] = (0, 0, 0),
+) -> None:
+    draw_text(surface, font, text, (center[0] + 3, center[1] + 3), shadow)
+    draw_text(surface, font, text, center, color)
+
+
 def item_color(kind: str) -> tuple[int, int, int]:
     if kind == "damage_up":
         return (255, 108, 95)
@@ -293,44 +337,59 @@ def item_color(kind: str) -> tuple[int, int, int]:
 
 def draw(
     surface: pygame.Surface,
+    background: pygame.Surface,
     balls: list[BallState],
     items: list[Item],
     effects: list[Effect],
+    popups: list[DamagePopup],
     boss_hp: int,
     boss_max_hp: int,
     status: str | None,
 ) -> None:
-    title_font = pygame.font.SysFont("arial", 48, bold=True)
-    hp_font = pygame.font.SysFont("arial", 36, bold=True)
-    item_font = pygame.font.SysFont("arial", 24, bold=True)
+    title_font = pygame.font.SysFont("arial", 54, bold=True)
+    hp_font = pygame.font.SysFont("arial", 42, bold=True)
+    item_font = pygame.font.SysFont("arial", 26, bold=True)
+    popup_font = pygame.font.SysFont("arial", 42, bold=True)
     status_font = pygame.font.SysFont("arial", 86, bold=True)
 
-    surface.fill((15, 18, 24))
+    surface.blit(background, (0, 0))
     pygame.draw.rect(surface, (230, 236, 242), surface.get_rect(), width=WALL_THICKNESS)
 
+    boss_shadow = BOSS_RECT.move(0, 10)
+    pygame.draw.rect(surface, (52, 20, 34), boss_shadow, border_radius=18)
     pygame.draw.rect(surface, (165, 48, 62), BOSS_RECT, border_radius=14)
+    boss_inner = BOSS_RECT.inflate(-28, -28)
+    pygame.draw.rect(surface, (214, 72, 88), boss_inner, border_radius=10)
     pygame.draw.rect(surface, (230, 236, 242), BOSS_RECT, width=5, border_radius=14)
-    draw_text(surface, title_font, "HP BOSS", BOSS_RECT.center, (255, 245, 230))
+    draw_text_with_shadow(surface, title_font, "HP BOSS", BOSS_RECT.center, (255, 245, 230))
 
     hp_ratio = boss_hp / boss_max_hp if boss_max_hp > 0 else 0
     hp_ratio = max(0.0, min(1.0, hp_ratio))
-    pygame.draw.rect(surface, (46, 52, 64), HP_BAR_RECT, border_radius=10)
+    pygame.draw.rect(surface, (12, 15, 22), HP_BAR_RECT.inflate(14, 14), border_radius=18)
+    pygame.draw.rect(surface, (46, 52, 64), HP_BAR_RECT, border_radius=14)
     hp_fill = pygame.Rect(HP_BAR_RECT.left, HP_BAR_RECT.top, round(HP_BAR_RECT.width * hp_ratio), HP_BAR_RECT.height)
-    pygame.draw.rect(surface, (242, 190, 76), hp_fill, border_radius=10)
-    pygame.draw.rect(surface, (230, 236, 242), HP_BAR_RECT, width=4, border_radius=10)
-    draw_text(surface, hp_font, f"HP {boss_hp}/{boss_max_hp}", HP_BAR_RECT.center, (255, 255, 255))
+    fill_color = (93, 230, 126) if hp_ratio > 0.5 else (242, 190, 76) if hp_ratio > 0.2 else (255, 92, 92)
+    pygame.draw.rect(surface, fill_color, hp_fill, border_radius=14)
+    pygame.draw.rect(surface, (250, 252, 255), HP_BAR_RECT, width=5, border_radius=14)
+    draw_text_with_shadow(surface, hp_font, f"HP {boss_hp:,}/{boss_max_hp:,}", HP_BAR_RECT.center, (255, 255, 255))
 
     for item in items:
         color = item_color(item.kind)
-        pygame.draw.circle(surface, color, (round(item.position.x), round(item.position.y)), item.radius)
-        pygame.draw.circle(surface, (255, 255, 255), (round(item.position.x), round(item.position.y)), item.radius, width=3)
+        center = (round(item.position.x), round(item.position.y))
+        pygame.draw.circle(surface, (255, 255, 255), center, item.radius + 11, width=4)
+        pygame.draw.circle(surface, (16, 20, 28), center, item.radius + 6)
+        pygame.draw.circle(surface, color, center, item.radius + 1)
+        pygame.draw.circle(surface, (255, 255, 255), center, item.radius, width=3)
         label = "DMG" if item.kind == "damage_up" else "SPD"
-        draw_text(surface, item_font, label, (round(item.position.x), round(item.position.y)), (20, 24, 30))
+        draw_text(surface, item_font, label, center, (20, 24, 30))
 
     for ball in balls:
         position = (round(ball.body.position.x), round(ball.body.position.y))
+        pygame.draw.circle(surface, (8, 16, 28), (position[0] + 5, position[1] + 7), BALL_RADIUS + 3)
+        pygame.draw.circle(surface, (245, 250, 255), position, BALL_RADIUS + 5)
         pygame.draw.circle(surface, (68, 180, 255), position, BALL_RADIUS)
-        pygame.draw.circle(surface, (210, 242, 255), position, BALL_RADIUS, width=3)
+        pygame.draw.circle(surface, (113, 218, 255), (position[0] - 9, position[1] - 10), max(8, BALL_RADIUS // 3))
+        pygame.draw.circle(surface, (7, 20, 32), position, BALL_RADIUS, width=3)
         draw_text(surface, item_font, str(ball.damage), position, (7, 20, 32))
 
     for effect in effects:
@@ -339,9 +398,15 @@ def draw(
         color = item_color(effect.kind)
         pygame.draw.circle(surface, color, (round(effect.position.x), round(effect.position.y)), radius, width=5)
 
+    for popup in popups:
+        progress = 1 - (popup.frames_left / POPUP_FRAMES)
+        y_offset = round(progress * 62)
+        center = (round(popup.position.x), round(popup.position.y) - y_offset)
+        draw_text_with_shadow(surface, popup_font, f"-{popup.amount}", center, (255, 230, 95))
+
     if status is not None:
         color = (104, 232, 143) if status == CLEAR else (255, 105, 105)
-        draw_text(surface, status_font, status, (WIDTH // 2, HEIGHT // 2), color)
+        draw_text_with_shadow(surface, status_font, status, (WIDTH // 2, HEIGHT // 2), color)
 
 
 def find_top_damage_ball(balls: list[BallState]) -> BallState:
@@ -358,17 +423,24 @@ def draw_result_screen(
     clear_frame: int | None,
     fps: int,
 ) -> None:
-    headline_font = pygame.font.SysFont("arial", 120, bold=True)
-    label_font = pygame.font.SysFont("arial", 48, bold=True)
-    value_font = pygame.font.SysFont("arial", 42, bold=True)
-    small_font = pygame.font.SysFont("arial", 34, bold=True)
+    headline_font = pygame.font.SysFont("arial", 138, bold=True)
+    label_font = pygame.font.SysFont("arial", 56, bold=True)
+    value_font = pygame.font.SysFont("arial", 46, bold=True)
+    small_font = pygame.font.SysFont("arial", 36, bold=True)
 
-    surface.fill((12, 15, 22))
+    top = pygame.Color(8, 12, 24)
+    bottom = pygame.Color(24, 32, 50)
+    for y in range(0, HEIGHT, 18):
+        pygame.draw.rect(surface, top.lerp(bottom, y / max(1, HEIGHT)), pygame.Rect(0, y, WIDTH, 18))
+
     color = (104, 232, 143) if status == CLEAR else (255, 105, 105)
-    pygame.draw.rect(surface, color, pygame.Rect(0, 0, WIDTH, 18))
-    pygame.draw.rect(surface, color, pygame.Rect(0, HEIGHT - 18, WIDTH, 18))
+    pygame.draw.rect(surface, color, pygame.Rect(0, 0, WIDTH, 26))
+    pygame.draw.rect(surface, color, pygame.Rect(0, HEIGHT - 26, WIDTH, 26))
 
-    draw_text(surface, headline_font, status, (WIDTH // 2, round(HEIGHT * 0.22)), color)
+    badge_rect = pygame.Rect(round(WIDTH * 0.12), round(HEIGHT * 0.13), round(WIDTH * 0.76), round(HEIGHT * 0.22))
+    pygame.draw.rect(surface, (12, 15, 22), badge_rect, border_radius=26)
+    pygame.draw.rect(surface, color, badge_rect, width=7, border_radius=26)
+    draw_text_with_shadow(surface, headline_font, status, badge_rect.center, color)
 
     if status == CLEAR and clear_frame is not None:
         clear_seconds = clear_frame / fps
@@ -384,13 +456,18 @@ def draw_result_screen(
         f"Hits / Damage  {top_ball.hits} / {top_ball.total_damage_dealt}",
     ]
 
-    start_y = round(HEIGHT * 0.38)
-    row_gap = round(HEIGHT * 0.075)
+    panel_rect = pygame.Rect(round(WIDTH * 0.1), round(HEIGHT * 0.42), round(WIDTH * 0.8), round(HEIGHT * 0.32))
+    pygame.draw.rect(surface, (20, 26, 38), panel_rect, border_radius=22)
+    pygame.draw.rect(surface, (82, 104, 138), panel_rect, width=3, border_radius=22)
+
+    start_y = panel_rect.top + round(panel_rect.height * 0.16)
+    row_gap = round(panel_rect.height * 0.18)
     for index, row in enumerate(rows):
         font = label_font if index == 0 else value_font
-        draw_text(surface, font, row, (WIDTH // 2, start_y + index * row_gap), (238, 244, 250))
+        row_color = color if index == 0 else (238, 244, 250)
+        draw_text_with_shadow(surface, font, row, (WIDTH // 2, start_y + index * row_gap), row_color)
 
-    draw_text(surface, small_font, "Evolving Balls vs HP Boss", (WIDTH // 2, round(HEIGHT * 0.86)), (160, 174, 190))
+    draw_text_with_shadow(surface, small_font, "Evolving Balls vs HP Boss", (WIDTH // 2, round(HEIGHT * 0.86)), (190, 204, 224))
 
 
 def parse_args() -> argparse.Namespace:
@@ -438,6 +515,7 @@ def run(
 
     pygame.init()
     render_surface = pygame.Surface((WIDTH, HEIGHT))
+    background = create_background()
     preview_screen = None
     clock = pygame.time.Clock()
 
@@ -455,6 +533,7 @@ def run(
     balls = [add_ball(space, rng, damage, ball_id=index + 1) for index in range(ball_count)]
     items: list[Item] = []
     effects: list[Effect] = []
+    popups: list[DamagePopup] = []
     boss_hp = boss_max_hp
     status = None
     frames_rendered = 0
@@ -491,18 +570,24 @@ def run(
                     item_spawn_count += 1
 
             for ball in balls:
-                boss_hp, total_damage = handle_boss_collision(ball, boss_hp, total_damage)
+                boss_hp, total_damage, dealt = handle_boss_collision(ball, boss_hp, total_damage)
+                if dealt > 0:
+                    popup_position = pygame.Vector2(ball.body.position.x, max(HP_BAR_RECT.bottom + 70, BOSS_RECT.top - 20))
+                    popups.append(DamagePopup(amount=dealt, position=popup_position))
                 limit_ball_speed(ball)
 
             if boss_hp <= 0:
                 status = CLEAR
                 clear_frame = frame_index
 
-            draw(render_surface, balls, items, effects, boss_hp, boss_max_hp, status)
+            draw(render_surface, background, balls, items, effects, popups, boss_hp, boss_max_hp, status)
 
             for effect in effects:
                 effect.frames_left -= 1
             effects = [effect for effect in effects if effect.frames_left > 0]
+            for popup in popups:
+                popup.frames_left -= 1
+            popups = [popup for popup in popups if popup.frames_left > 0]
 
             gained_damage_up, gained_speed_up = handle_item_collisions(balls, items, effects)
             damage_up_count += gained_damage_up
