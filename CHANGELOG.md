@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 0.11.0 - 2026-05-07
+
+### Changed
+
+- Limited food duel hit-stop to Burger Charge hits only so repeated damage ticks no longer freeze the action.
+- Changed Burger ingredient allies to bounce around the arena instead of tracking the enemy.
+- Changed Burger rendering so its inner filling visually disappears as HP is spent.
+- Retuned default food duel HP values to keep the less-stopped battle near 20 seconds.
+- Updated food duel documentation for the revised Burger Charge and ingredient ally behavior.
+
 ## 0.10.0 - 2026-05-07
 
 ### Added

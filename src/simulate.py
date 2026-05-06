@@ -948,7 +948,34 @@ def draw_food_sprite(surface: pygame.Surface, ball: DuelBall, position: tuple[in
     shadow.fill((0, 0, 0, 120), special_flags=pygame.BLEND_RGBA_MULT)
     surface.blit(shadow, rect.move(12, 16))
     surface.blit(rotated, rect)
+    if ball.skin == "burger":
+        draw_burger_depletion(surface, ball, position)
     return True
+
+
+def draw_burger_depletion(surface: pygame.Surface, ball: DuelBall, position: tuple[int, int]) -> None:
+    lost_ratio = max(0.0, min(1.0, 1 - ball.hp / max(1, ball.max_hp)))
+    if lost_ratio <= 0.08:
+        return
+
+    x, y = position
+    missing_layers = min(4, int(lost_ratio * 4.8))
+    layer_width = round(ball.radius * 1.62)
+    layer_height = max(9, round(ball.radius * 0.16))
+    start_y = y - round(ball.radius * 0.36)
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    for index in range(missing_layers):
+        rect = pygame.Rect(0, 0, layer_width - index * round(ball.radius * 0.15), layer_height)
+        rect.center = (x + round(ball.radius * 0.1), start_y + index * round(ball.radius * 0.22))
+        pygame.draw.rect(overlay, (5, 7, 11, 205), rect, border_radius=max(4, layer_height // 2))
+        pygame.draw.line(
+            overlay,
+            (255, 222, 106, 130),
+            (rect.left + 10, rect.centery),
+            (rect.right - 10, rect.centery),
+            max(2, round(layer_height * 0.22)),
+        )
+    surface.blit(overlay, (0, 0))
 
 
 def draw_duel_ball(surface: pygame.Surface, ball: DuelBall, font: pygame.font.Font) -> None:
@@ -1374,10 +1401,6 @@ def update_ingredient_allies(
         if ally.hit_cooldown > 0:
             ally.hit_cooldown -= 1
         ally.frames_left -= 1
-        direction = target.position - ally.position
-        if direction.length_squared() > 0:
-            desired = direction.normalize() * 420
-            ally.velocity = ally.velocity.lerp(desired, 0.035)
         ally.position += ally.velocity / FPS
         if ally.velocity.length_squared() > 0:
             ally.visual_angle = ally.velocity.as_polar()[1] + 90
@@ -1413,12 +1436,12 @@ def handle_duel_collision(
     audio_events: list[AudioEvent],
     frame_index: int,
     rng: random.Random,
-) -> bool:
+) -> tuple[bool, bool]:
     delta = right.position - left.position
     distance = delta.length()
     min_distance = left.radius + right.radius
     if distance <= 0 or distance >= min_distance:
-        return False
+        return False, False
 
     normal = delta.normalize()
     overlap = min_distance - distance
@@ -1430,8 +1453,10 @@ def handle_duel_collision(
     effects.append(DuelEffect("impact", midpoint, 24, (255, 255, 255)))
     audio_events.append(AudioEvent(frame_index, "impact"))
     hit_landed = False
+    burger_charge_hit = False
 
     if left.hit_cooldown == 0:
+        was_burger_charge = left.skin == "burger" and left.charge_frames > 0
         damage = min(right.hp, apply_duel_skill(left, right, base_damage, rng, effects, audio_events, frame_index))
         right.hp -= damage
         left.total_damage_dealt += damage
@@ -1439,8 +1464,10 @@ def handle_duel_collision(
         left.hit_cooldown = 28
         popups.append(DamagePopup(amount=damage, position=right.position.copy()))
         hit_landed = True
+        burger_charge_hit = burger_charge_hit or was_burger_charge
 
     if right.hit_cooldown == 0:
+        was_burger_charge = right.skin == "burger" and right.charge_frames > 0
         damage = min(left.hp, apply_duel_skill(right, left, base_damage, rng, effects, audio_events, frame_index))
         left.hp -= damage
         right.total_damage_dealt += damage
@@ -1448,7 +1475,8 @@ def handle_duel_collision(
         right.hit_cooldown = 28
         popups.append(DamagePopup(amount=damage, position=left.position.copy()))
         hit_landed = True
-    return hit_landed
+        burger_charge_hit = burger_charge_hit or was_burger_charge
+    return hit_landed, burger_charge_hit
 
 
 def draw_duel_result(surface: pygame.Surface, winner: DuelBall, loser: DuelBall, frame_index: int, fps: int) -> None:
@@ -1603,13 +1631,16 @@ def run_food_duel(
                         audio_events,
                         frame_index,
                     )
-                    hit_landed = handle_duel_collision(left, right, damage, popups, duel_effects, audio_events, frame_index, rng)
+                    hit_landed, burger_charge_hit = handle_duel_collision(left, right, damage, popups, duel_effects, audio_events, frame_index, rng)
                     if ally_damage > 0:
                         right.total_damage_dealt += ally_damage
-                    if hit_landed or ally_damage > 0 or cheese_damage_done > 0:
+                    if burger_charge_hit:
                         hit_stop_frames = 7
                         shake_frames = 16
                         shake_strength = 22
+                    elif hit_landed:
+                        shake_frames = max(shake_frames, 7)
+                        shake_strength = max(shake_strength, 10)
                 else:
                     hit_stop_frames -= 1
 
