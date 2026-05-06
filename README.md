@@ -145,6 +145,47 @@ The metadata includes:
 
 The title is generated in English for Shorts, the description includes `#shorts`, and `tags` is a JSON array. This metadata is only saved locally; YouTube upload is not implemented.
 
+## YouTube Upload Preparation
+
+`src/upload_youtube.py` is a safe upload preparation stub. It reads a metadata JSON file and prints the upload payload, but it does not upload to YouTube.
+
+Dry-run preview:
+
+```powershell
+python src/upload_youtube.py --metadata output/metadata/simulation_001.json --dry-run
+```
+
+List available metadata files:
+
+```powershell
+python src/upload_youtube.py --list
+```
+
+The default privacy status is `private`.
+
+```powershell
+python src/upload_youtube.py --metadata output/metadata/simulation_001.json --dry-run --privacy-status private
+```
+
+Before real upload support is added later:
+
+1. Create a Google Cloud project.
+2. Enable the YouTube Data API v3.
+3. Create OAuth client credentials for a desktop app.
+4. Download the OAuth file as `client_secrets.json`.
+5. Place `client_secrets.json` at the project root only on your local machine.
+
+Do not commit credentials. `.gitignore` excludes:
+
+- `client_secrets.json`
+- `client_secret*.json`
+- `token.json`
+- `credentials.json`
+- `oauth_token.json`
+- `output/`
+
+Actual upload is intentionally not implemented yet. Running with `--no-dry-run` exits with an error instead of uploading.
+
 ## Current Scope
 
 - Physics: pymunk
@@ -156,4 +197,4 @@ The title is generated in English for Shorts, the description includes `#shorts`
 - Result screen
 - Frame output: `output/frames/`
 - Video output: `output/videos/<output_name>.mp4`
-- YouTube upload: not implemented
+- YouTube upload: dry-run preparation only
