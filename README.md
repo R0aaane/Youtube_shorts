@@ -31,6 +31,37 @@ The default config is `configs/boss_battle_001.json`.
 
 Edit this JSON to change the ball count, boss HP, base damage, item interval, random seed, and output video name. Using the same `random_seed` makes results more reproducible.
 
+## Generate Multiple Configs
+
+Use `generate_config.py` to create many simulation variants for batch production.
+
+```powershell
+python src/generate_config.py --count 10 --theme boss_battle
+```
+
+Generated files are saved under:
+
+```text
+configs/generated/
+```
+
+Each generated config varies:
+
+- `boss_hp`
+- `initial_ball_count`
+- `item_spawn_interval`
+- `random_seed`
+- `base_damage`
+- `output_name`
+
+The `output_name` is unique, so generated videos and metadata files do not overwrite each other.
+
+Generate a video from one generated config:
+
+```powershell
+python src/generate_video.py --config configs/generated/boss_battle_001.json
+```
+
 ## Generate Frames
 
 ```powershell

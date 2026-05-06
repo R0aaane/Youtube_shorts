@@ -1,0 +1,12 @@
+{
+  "video_width": 1080,
+  "video_height": 1920,
+  "fps": 60,
+  "duration_seconds": 10,
+  "initial_ball_count": 75,
+  "boss_hp": 100000,
+  "base_damage": 15,
+  "item_spawn_interval": 75,
+  "random_seed": 657488,
+  "output_name": "boss_battle_005"
+}
