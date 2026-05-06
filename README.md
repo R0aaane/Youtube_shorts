@@ -62,6 +62,24 @@ Generate a video from one generated config:
 python src/generate_video.py --config configs/generated/boss_battle_001.json
 ```
 
+Batch-generate videos from all generated configs:
+
+```powershell
+python src/batch_generate.py --config-dir configs/generated
+```
+
+By default, the batch stops on the first failed config. To keep processing the remaining configs:
+
+```powershell
+python src/batch_generate.py --config-dir configs/generated --continue-on-error
+```
+
+At the end, the command prints a success/failure summary and writes a log to:
+
+```text
+output/metadata/batch_result.json
+```
+
 ## Generate Frames
 
 ```powershell
