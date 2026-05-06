@@ -167,6 +167,7 @@ class DuelBall:
     hits: int = 0
     trail: list[pygame.Vector2] = field(default_factory=list)
     visual_angle: float = 0.0
+    missing_ingredients: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -982,40 +983,44 @@ def draw_food_sprite(surface: pygame.Surface, ball: DuelBall, position: tuple[in
     pygame.draw.circle(glow, glow_color, position, round(ball.radius * 1.35))
     pygame.draw.circle(glow, (*duel_attack_color(ball.skin), 88), position, round(ball.radius * 1.02), width=5)
     surface.blit(glow, (0, 0))
+    if ball.skin == "burger" and ball.missing_ingredients:
+        sprite = burger_sprite_with_missing_ingredients(sprite, ball.missing_ingredients)
     rotated = pygame.transform.rotozoom(sprite, -ball.visual_angle, 1.0)
     rect = rotated.get_rect(center=position)
     shadow = rotated.copy()
     shadow.fill((0, 0, 0, 150), special_flags=pygame.BLEND_RGBA_MULT)
     surface.blit(shadow, rect.move(10, 14))
     surface.blit(rotated, rect)
-    if ball.skin == "burger":
-        draw_burger_depletion(surface, ball, position)
     return True
 
 
-def draw_burger_depletion(surface: pygame.Surface, ball: DuelBall, position: tuple[int, int]) -> None:
-    lost_ratio = max(0.0, min(1.0, 1 - ball.hp / max(1, ball.max_hp)))
-    if lost_ratio <= 0.08:
-        return
+def burger_sprite_with_missing_ingredients(sprite: pygame.Surface, missing_ingredients: list[str]) -> pygame.Surface:
+    cache_key = f"burger_missing:{id(sprite)}:{'-'.join(missing_ingredients[-4:])}"
+    if cache_key in SPRITE_CACHE:
+        return SPRITE_CACHE[cache_key]
 
-    x, y = position
-    missing_layers = min(4, int(lost_ratio * 4.8))
-    layer_width = round(ball.radius * 1.62)
-    layer_height = max(9, round(ball.radius * 0.16))
-    start_y = y - round(ball.radius * 0.36)
-    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-    for index in range(missing_layers):
-        rect = pygame.Rect(0, 0, layer_width - index * round(ball.radius * 0.15), layer_height)
-        rect.center = (x + round(ball.radius * 0.1), start_y + index * round(ball.radius * 0.22))
-        pygame.draw.rect(overlay, (5, 7, 11, 205), rect, border_radius=max(4, layer_height // 2))
-        pygame.draw.line(
-            overlay,
-            (255, 222, 106, 130),
-            (rect.left + 10, rect.centery),
-            (rect.right - 10, rect.centery),
-            max(2, round(layer_height * 0.22)),
-        )
-    surface.blit(overlay, (0, 0))
+    edited = sprite.copy()
+    width, height = edited.get_size()
+    layer_map = {
+        "lettuce": (0.48, 0.28, 0.10, (37, 50, 24, 220)),
+        "cheese": (0.56, 0.26, 0.09, (90, 58, 24, 220)),
+        "tomato": (0.61, 0.24, 0.09, (73, 28, 24, 220)),
+        "meat": (0.67, 0.30, 0.12, (42, 27, 18, 230)),
+    }
+    for index, kind in enumerate(missing_ingredients[-4:]):
+        y_ratio, width_ratio, height_ratio, fill = layer_map.get(kind, (0.55, 0.26, 0.1, (42, 27, 18, 220)))
+        cut_width = round(width * max(0.18, width_ratio - index * 0.025))
+        cut_height = round(height * height_ratio)
+        cut = pygame.Rect(0, 0, cut_width, cut_height)
+        cut.center = (round(width * (0.66 - (index % 2) * 0.07)), round(height * y_ratio))
+        pygame.draw.ellipse(edited, fill, cut)
+        pygame.draw.ellipse(edited, (12, 9, 7, 120), cut, width=max(2, round(height * 0.012)))
+        inner = cut.inflate(-round(width * 0.08), -round(height * 0.035))
+        if inner.width > 0 and inner.height > 0:
+            pygame.draw.ellipse(edited, (20, 14, 10, 120), inner)
+
+    SPRITE_CACHE[cache_key] = edited
+    return edited
 
 
 def draw_duel_ball(surface: pygame.Surface, ball: DuelBall, font: pygame.font.Font) -> None:
@@ -1114,11 +1119,23 @@ def draw_cheese_patches(surface: pygame.Surface, patches: list[CheesePatch], lef
         target = duel_ball_by_side(patch.attached_to, left, right)
         position = target.position + patch.offset.rotate(target.visual_angle)
         center = (round(position.x), round(position.y))
-        pygame.draw.circle(surface, (255, 222, 68), center, 20)
-        pygame.draw.circle(surface, (255, 246, 164), (center[0] - 6, center[1] - 5), 7)
-        for angle in [30, 150, 270]:
-            end = pygame.Vector2(center) + pygame.Vector2(1, 0).rotate(angle + target.visual_angle) * 34
-            pygame.draw.line(surface, (255, 220, 68), center, end, 6)
+        age = 1 - patch.frames_left / 210
+        base_radius = round(target.radius * (0.28 + min(0.18, age * 0.18)))
+        cheese = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        points = []
+        for angle, scale in [(0, 1.0), (45, 0.78), (95, 1.12), (150, 0.82), (210, 1.05), (285, 0.72)]:
+            offset = pygame.Vector2(1, 0).rotate(angle + target.visual_angle) * (base_radius * scale)
+            points.append((round(center[0] + offset.x), round(center[1] + offset.y)))
+        pygame.draw.polygon(cheese, (255, 211, 54, 232), points)
+        pygame.draw.polygon(cheese, (167, 105, 18, 190), points, width=max(3, base_radius // 9))
+        pygame.draw.circle(cheese, (255, 232, 98, 238), center, round(base_radius * 0.72))
+        pygame.draw.circle(cheese, (255, 248, 177, 215), (center[0] - round(base_radius * 0.28), center[1] - round(base_radius * 0.24)), max(6, round(base_radius * 0.22)))
+        for angle, length_scale in [(75, 0.72), (130, 0.56), (250, 0.64)]:
+            start = pygame.Vector2(center) + pygame.Vector2(1, 0).rotate(angle + target.visual_angle) * (base_radius * 0.4)
+            end = pygame.Vector2(center) + pygame.Vector2(1, 0).rotate(angle + target.visual_angle) * (base_radius * (1.0 + length_scale))
+            pygame.draw.line(cheese, (255, 210, 50, 222), start, end, max(8, base_radius // 5))
+            pygame.draw.circle(cheese, (255, 210, 50, 230), (round(end.x), round(end.y)), max(6, base_radius // 7))
+        surface.blit(cheese, (0, 0))
 
 
 def ingredient_color(kind: str) -> tuple[int, int, int]:
@@ -1316,6 +1333,8 @@ def update_duel_ball(
             if paid_cost > 0:
                 ball.hp -= paid_cost
                 ingredient_kinds = ["lettuce", "cheese", "tomato", "meat"]
+                ingredient_kind = ingredient_kinds[len(ball.missing_ingredients) % len(ingredient_kinds)]
+                ball.missing_ingredients.append(ingredient_kind)
                 spawn_direction = -direction.normalize()
                 spawn_offset = spawn_direction.rotate(rng.uniform(-18, 18)) * (ball.radius + round(ball.radius * 0.58))
                 spawn_position = ball.position + spawn_offset
@@ -1323,7 +1342,6 @@ def update_duel_ball(
                 if target_direction.length_squared() == 0:
                     target_direction = -spawn_direction
                 velocity = target_direction.normalize().rotate(rng.uniform(-16, 16)) * 500
-                ingredient_kind = rng.choice(ingredient_kinds)
                 allies.append(
                     IngredientAlly(
                         kind=ingredient_kind,
@@ -1791,11 +1809,11 @@ def run_food_duel(
             ball_font = make_font(max(48, round(radius * 0.43)), bold=True)
             if winner is None:
                 draw_duel_effects(render_surface, duel_effects)
-                draw_cheese_patches(render_surface, cheese_patches, left, right)
                 draw_cheese_projectiles(render_surface, cheese_projectiles)
                 draw_ingredient_allies(render_surface, ingredient_allies)
                 draw_duel_ball(render_surface, left, ball_font)
                 draw_duel_ball(render_surface, right, ball_font)
+                draw_cheese_patches(render_surface, cheese_patches, left, right)
                 draw_duel_intro(render_surface, frame_index, ready_frames, intro_frames)
 
                 for popup in popups:

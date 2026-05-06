@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 0.15.1 - 2026-05-07
+
+### Changed
+
+- Changed sticky cheese patches to render as melted cheese stuck on top of the target food sprite.
+- Replaced Burger's overlaid missing-filling bars with sprite-level missing ingredient marks based on summoned ingredient type.
+- Updated food duel documentation for visible cheese attachment and Burger ingredient loss visuals.
+
 ## 0.15.0 - 2026-05-07
 
 ### Added
