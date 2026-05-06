@@ -31,3 +31,8 @@ def test_food_duel_config_uses_large_versus_balls() -> None:
     assert config.duel_speed_scale < 1.0
     assert config.duel_left_food == "pizza"
     assert config.duel_right_food == "burger"
+
+
+def test_food_duel_realistic_sprites_exist() -> None:
+    assert Path("assets/food_sprites/pizza_magenta.png").exists()
+    assert Path("assets/food_sprites/burger_magenta.png").exists()

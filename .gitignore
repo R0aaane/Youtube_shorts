@@ -74,6 +74,8 @@ output/logs/
 # Keep asset placeholders if needed
 !assets/
 !assets/**/.gitkeep
+!assets/food_sprites/
+!assets/food_sprites/*.png
 !configs/
 !configs/**/*.json
 

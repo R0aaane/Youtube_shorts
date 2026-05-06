@@ -136,6 +136,7 @@ This creates a large-ball 1v1 battle where two food balls use their own skills i
 Pizza Burn shows flame rings and damage-over-time ticks. Burger Charge shows a blue dash trail and impact shockwave.
 The generated MP4 includes synthesized arcade audio: READY/FIGHT callouts, hit sounds, burn ticks, and charge impacts. The matching WAV is saved under `output/audio/`.
 The default duel config is tuned for about 20 seconds: `duration_seconds` controls total length, `duel_speed_scale` controls normal movement speed, and `duel_charge_speed` controls charge speed.
+Food duel uses realistic generated food sprites from `assets/food_sprites/`. Collision remains circle-based internally, but the visible objects are the food sprites. Heavy hits trigger hit-stop, screen shake, and larger shockwave effects.
 
 It runs these steps in order:
 

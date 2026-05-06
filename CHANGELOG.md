@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## 0.7.0 - 2026-05-06
+
+### Added
+
+- Added realistic generated pizza and burger sprites for the food duel.
+- Added hit-stop and screen shake on duel hits.
+- Added stronger shockwave effects for duel impacts.
+- Allowed project-owned food sprite PNG assets to be tracked.
+
+### Changed
+
+- Changed food duel rendering so the food image is the visible object while the circular hitbox stays internal.
+- Updated food duel documentation for the new impact and sprite presentation.
+
 ## 0.6.0 - 2026-05-06
 
 ### Added
