@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 0.6.0 - 2026-05-06
+
+### Added
+
+- Added duel speed tuning options for normal movement and charge movement.
+
+### Changed
+
+- Tuned the default food duel config for a slower, easier-to-follow 20-second video.
+- Updated food duel documentation to explain the timing and speed controls.
+
 ## 0.5.0 - 2026-05-06
 
 ### Added

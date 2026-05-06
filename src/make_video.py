@@ -74,6 +74,8 @@ def load_video_config(path: Path | None) -> tuple[dict, Path | None]:
         "duel_left_hp": 240,
         "duel_right_hp": 260,
         "duel_ball_radius": 118,
+        "duel_speed_scale": 1.0,
+        "duel_charge_speed": 1220,
         "audio_enabled": True,
     }
     config_path = resolve_config_path(path)

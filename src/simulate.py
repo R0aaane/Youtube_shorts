@@ -60,6 +60,8 @@ class SimulationConfig:
     duel_left_hp: int = 240
     duel_right_hp: int = 260
     duel_ball_radius: int = 118
+    duel_speed_scale: float = 1.0
+    duel_charge_speed: int = 1220
     audio_enabled: bool = True
 
     @property
@@ -87,6 +89,8 @@ DEFAULT_CONFIG = {
     "duel_left_hp": 240,
     "duel_right_hp": 260,
     "duel_ball_radius": 118,
+    "duel_speed_scale": 1.0,
+    "duel_charge_speed": 1220,
     "audio_enabled": True,
 }
 
@@ -943,6 +947,7 @@ def update_duel_ball(
     rng: random.Random,
     audio_events: list[AudioEvent],
     frame_index: int,
+    charge_speed: int,
 ) -> None:
     if ball.skill_cooldown > 0:
         ball.skill_cooldown -= 1
@@ -958,7 +963,7 @@ def update_duel_ball(
     if ball.skin == "burger" and ball.skill_cooldown == 0:
         direction = target.position - ball.position
         if direction.length_squared() > 0:
-            ball.velocity = direction.normalize() * 1220
+            ball.velocity = direction.normalize() * charge_speed
             ball.charge_frames = 36
             ball.skill_cooldown = 132
             audio_events.append(AudioEvent(frame_index, "charge_start"))
@@ -1073,6 +1078,8 @@ def run_food_duel(
     clear_frames_dir()
     rng = random.Random(seed)
     radius = config.duel_ball_radius
+    speed_scale = max(0.2, config.duel_speed_scale)
+    charge_speed = max(240, config.duel_charge_speed)
     arena_rect = pygame.Rect(round(WIDTH * 0.09), round(HEIGHT * 0.21), round(WIDTH * 0.82), round(HEIGHT * 0.57))
     left_style = FOOD_BALL_STYLES.get(config.duel_left_food, FOOD_BALL_STYLES["pizza"])
     right_style = FOOD_BALL_STYLES.get(config.duel_right_food, FOOD_BALL_STYLES["burger"])
@@ -1083,7 +1090,7 @@ def run_food_duel(
         hp=config.duel_left_hp,
         max_hp=config.duel_left_hp,
         position=pygame.Vector2(arena_rect.left + radius + 70, arena_rect.centery - 110),
-        velocity=pygame.Vector2(520, 420),
+        velocity=pygame.Vector2(520, 420) * speed_scale,
         radius=radius,
     )
     right = DuelBall(
@@ -1093,7 +1100,7 @@ def run_food_duel(
         hp=config.duel_right_hp,
         max_hp=config.duel_right_hp,
         position=pygame.Vector2(arena_rect.right - radius - 70, arena_rect.centery + 110),
-        velocity=pygame.Vector2(-620, -360),
+        velocity=pygame.Vector2(-620, -360) * speed_scale,
         radius=radius,
     )
     popups: list[DamagePopup] = []
@@ -1101,6 +1108,7 @@ def run_food_duel(
     audio_events: list[AudioEvent] = [AudioEvent(1, "ready"), AudioEvent(46, "fight")]
     intro_frames = 90
     result_frame_count = min(fps * 3, max(1, frame_count // 2))
+    simulation_frame_limit = frame_count - result_frame_count
     winner: DuelBall | None = None
     loser: DuelBall | None = None
     result_started_frame: int | None = None
@@ -1116,34 +1124,40 @@ def run_food_duel(
 
         if winner is None:
             arena_rect = draw_duel_background(render_surface)
-            if frame_index > intro_frames:
-                update_duel_ball(left, right, arena_rect, rng, audio_events, frame_index)
-                update_duel_ball(right, left, arena_rect, rng, audio_events, frame_index)
+            if frame_index > simulation_frame_limit:
+                winner, loser = (left, right) if left.hp >= right.hp else (right, left)
+                result_started_frame = frame_index
+            if winner is None and frame_index > intro_frames:
+                update_duel_ball(left, right, arena_rect, rng, audio_events, frame_index, charge_speed)
+                update_duel_ball(right, left, arena_rect, rng, audio_events, frame_index, charge_speed)
                 handle_duel_collision(left, right, damage, popups, duel_effects, audio_events, frame_index, rng)
                 apply_burn(left, popups, duel_effects, audio_events, frame_index)
                 apply_burn(right, popups, duel_effects, audio_events, frame_index)
 
-            if left.hp <= 0 or right.hp <= 0:
+            if winner is None and (left.hp <= 0 or right.hp <= 0):
                 winner, loser = (left, right) if left.hp > right.hp else (right, left)
                 result_started_frame = frame_index + 1
 
             ball_font = pygame.font.SysFont("arial", max(48, round(radius * 0.43)), bold=True)
             popup_font = pygame.font.SysFont("arial", 62, bold=True)
-            draw_duel_effects(render_surface, duel_effects)
-            draw_duel_ball(render_surface, left, ball_font)
-            draw_duel_ball(render_surface, right, ball_font)
-            draw_duel_intro(render_surface, frame_index, intro_frames)
+            if winner is None:
+                draw_duel_effects(render_surface, duel_effects)
+                draw_duel_ball(render_surface, left, ball_font)
+                draw_duel_ball(render_surface, right, ball_font)
+                draw_duel_intro(render_surface, frame_index, intro_frames)
 
-            for popup in popups:
-                progress = 1 - (popup.frames_left / POPUP_FRAMES)
-                center = (round(popup.position.x), round(popup.position.y - progress * 88))
-                draw_text_with_shadow(render_surface, popup_font, f"-{popup.amount}", center, (255, 238, 96))
-                popup.frames_left -= 1
-            popups = [popup for popup in popups if popup.frames_left > 0]
-            for effect in duel_effects:
-                effect.frames_left -= 1
-            duel_effects = [effect for effect in duel_effects if effect.frames_left > 0]
-            draw_duel_hud(render_surface, left, right, frame_index)
+                for popup in popups:
+                    progress = 1 - (popup.frames_left / POPUP_FRAMES)
+                    center = (round(popup.position.x), round(popup.position.y - progress * 88))
+                    draw_text_with_shadow(render_surface, popup_font, f"-{popup.amount}", center, (255, 238, 96))
+                    popup.frames_left -= 1
+                popups = [popup for popup in popups if popup.frames_left > 0]
+                for effect in duel_effects:
+                    effect.frames_left -= 1
+                duel_effects = [effect for effect in duel_effects if effect.frames_left > 0]
+                draw_duel_hud(render_surface, left, right, frame_index)
+            else:
+                draw_duel_result(render_surface, winner, loser or left, frame_index, fps)
         else:
             if result_started_frame is None:
                 result_started_frame = frame_index
@@ -1193,6 +1207,8 @@ def run_food_duel(
         },
         "base_damage": damage,
         "ball_radius": radius,
+        "speed_scale": speed_scale,
+        "charge_speed": charge_speed,
         "frames_rendered": frames_rendered,
         "result_started_frame": result_started_frame,
         "fps": fps,
