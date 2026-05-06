@@ -53,6 +53,28 @@ python src/simulate.py --config configs/boss_battle_001.json --window
 
 The preview window is scaled down to fit on screen. Saved PNG frames keep the configured resolution.
 
+## Generate Everything
+
+Use this command to run the full local pipeline from one config:
+
+```powershell
+python src/generate_video.py --config configs/boss_battle_001.json
+```
+
+It runs these steps in order:
+
+1. Generate PNG frames
+2. Encode the MP4 with FFmpeg
+3. Save the matching YouTube metadata JSON
+
+On success, it prints the generated video path and metadata path. If any step fails, it prints which part failed.
+
+To preview while frames are generated:
+
+```powershell
+python src/generate_video.py --config configs/boss_battle_001.json --window
+```
+
 ## Result Screen
 
 The generated frame sequence ends with a 3-second result screen.
