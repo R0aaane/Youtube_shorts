@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 0.5.0 - 2026-05-06
+
+### Added
+
+- Added synthesized audio generation for duel videos, including READY/FIGHT callouts, hit sounds, burn ticks, and charge impacts.
+- Added MP4 audio muxing and local WAV output under `output/audio/`.
+- Added audio file references to generated YouTube metadata.
+
 ## 0.4.1 - 2026-05-06
 
 ### Changed

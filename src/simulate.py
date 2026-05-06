@@ -60,6 +60,7 @@ class SimulationConfig:
     duel_left_hp: int = 240
     duel_right_hp: int = 260
     duel_ball_radius: int = 118
+    audio_enabled: bool = True
 
     @property
     def frame_count(self) -> int:
@@ -86,6 +87,7 @@ DEFAULT_CONFIG = {
     "duel_left_hp": 240,
     "duel_right_hp": 260,
     "duel_ball_radius": 118,
+    "audio_enabled": True,
 }
 
 
@@ -154,6 +156,12 @@ class DuelEffect:
     frames_left: int
     color: tuple[int, int, int]
     label: str = ""
+
+
+@dataclass
+class AudioEvent:
+    frame: int
+    kind: str
 
 
 def update_layout(width: int, height: int) -> None:
@@ -882,12 +890,29 @@ def draw_duel_hud(surface: pygame.Surface, left: DuelBall, right: DuelBall, fram
     pygame.draw.rect(surface, (255, 42, 130), pygame.Rect(68, HEIGHT - 74, round((WIDTH - 136) * progress), 9))
 
 
+def draw_duel_intro(surface: pygame.Surface, frame_index: int, intro_frames: int) -> None:
+    if frame_index > intro_frames:
+        return
+    intro_font = pygame.font.SysFont("arial", 118, bold=True)
+    small_font = pygame.font.SysFont("arial", 42, bold=True)
+    if frame_index <= intro_frames // 2:
+        text = "READY"
+        color = (255, 238, 128)
+    else:
+        text = "FIGHT!"
+        color = (105, 225, 255)
+    draw_text_with_shadow(surface, intro_font, text, (WIDTH // 2, round(HEIGHT * 0.47)), color)
+    draw_text_with_shadow(surface, small_font, "PIZZA BURN  VS  BURGER CHARGE", (WIDTH // 2, round(HEIGHT * 0.55)), (255, 245, 230))
+
+
 def apply_duel_skill(
     attacker: DuelBall,
     defender: DuelBall,
     base_damage: int,
     rng: random.Random,
     effects: list[DuelEffect],
+    audio_events: list[AudioEvent],
+    frame_index: int,
 ) -> int:
     damage = base_damage
     if attacker.skin == "pizza":
@@ -895,9 +920,11 @@ def apply_duel_skill(
         defender.burn_frames = 90
         defender.burn_tick = 15
         effects.append(DuelEffect("burn", defender.position.copy(), 36, (255, 172, 58), "BURN"))
+        audio_events.append(AudioEvent(frame_index, "burn"))
     elif attacker.skin == "burger" and attacker.charge_frames > 0:
         damage += 35
         effects.append(DuelEffect("charge", defender.position.copy(), 30, (105, 225, 255), "CHARGE HIT"))
+        audio_events.append(AudioEvent(frame_index, "charge_hit"))
     elif attacker.skin == "sushi":
         attacker.hp = min(attacker.max_hp, attacker.hp + 14)
     elif attacker.skin == "taco" and rng.random() < 0.35:
@@ -909,7 +936,14 @@ def apply_duel_skill(
     return damage
 
 
-def update_duel_ball(ball: DuelBall, target: DuelBall, arena_rect: pygame.Rect, rng: random.Random) -> None:
+def update_duel_ball(
+    ball: DuelBall,
+    target: DuelBall,
+    arena_rect: pygame.Rect,
+    rng: random.Random,
+    audio_events: list[AudioEvent],
+    frame_index: int,
+) -> None:
     if ball.skill_cooldown > 0:
         ball.skill_cooldown -= 1
     if ball.hit_cooldown > 0:
@@ -927,6 +961,7 @@ def update_duel_ball(ball: DuelBall, target: DuelBall, arena_rect: pygame.Rect, 
             ball.velocity = direction.normalize() * 1220
             ball.charge_frames = 36
             ball.skill_cooldown = 132
+            audio_events.append(AudioEvent(frame_index, "charge_start"))
     elif ball.skill_cooldown == 0:
         ball.velocity.rotate_ip(rng.uniform(-22, 22))
         ball.skill_cooldown = 120
@@ -948,7 +983,7 @@ def update_duel_ball(ball: DuelBall, target: DuelBall, arena_rect: pygame.Rect, 
         ball.velocity.y = -abs(ball.velocity.y)
 
 
-def apply_burn(ball: DuelBall, popups: list[DamagePopup], effects: list[DuelEffect]) -> int:
+def apply_burn(ball: DuelBall, popups: list[DamagePopup], effects: list[DuelEffect], audio_events: list[AudioEvent], frame_index: int) -> int:
     if ball.burn_frames <= 0:
         return 0
     ball.burn_frames -= 1
@@ -960,6 +995,7 @@ def apply_burn(ball: DuelBall, popups: list[DamagePopup], effects: list[DuelEffe
     ball.hp -= damage
     popups.append(DamagePopup(amount=damage, position=ball.position.copy()))
     effects.append(DuelEffect("burn", ball.position.copy(), 18, (255, 172, 58), "FIRE"))
+    audio_events.append(AudioEvent(frame_index, "fire_tick"))
     return damage
 
 
@@ -969,6 +1005,8 @@ def handle_duel_collision(
     base_damage: int,
     popups: list[DamagePopup],
     effects: list[DuelEffect],
+    audio_events: list[AudioEvent],
+    frame_index: int,
     rng: random.Random,
 ) -> None:
     delta = right.position - left.position
@@ -985,9 +1023,10 @@ def handle_duel_collision(
     right.velocity = right.velocity.reflect(-normal)
     midpoint = left.position + normal * (min_distance / 2)
     effects.append(DuelEffect("impact", midpoint, 24, (255, 255, 255)))
+    audio_events.append(AudioEvent(frame_index, "impact"))
 
     if left.hit_cooldown == 0:
-        damage = min(right.hp, apply_duel_skill(left, right, base_damage, rng, effects))
+        damage = min(right.hp, apply_duel_skill(left, right, base_damage, rng, effects, audio_events, frame_index))
         right.hp -= damage
         left.total_damage_dealt += damage
         left.hits += 1
@@ -995,7 +1034,7 @@ def handle_duel_collision(
         popups.append(DamagePopup(amount=damage, position=right.position.copy()))
 
     if right.hit_cooldown == 0:
-        damage = min(left.hp, apply_duel_skill(right, left, base_damage, rng, effects))
+        damage = min(left.hp, apply_duel_skill(right, left, base_damage, rng, effects, audio_events, frame_index))
         left.hp -= damage
         right.total_damage_dealt += damage
         right.hits += 1
@@ -1059,6 +1098,8 @@ def run_food_duel(
     )
     popups: list[DamagePopup] = []
     duel_effects: list[DuelEffect] = []
+    audio_events: list[AudioEvent] = [AudioEvent(1, "ready"), AudioEvent(46, "fight")]
+    intro_frames = 90
     result_frame_count = min(fps * 3, max(1, frame_count // 2))
     winner: DuelBall | None = None
     loser: DuelBall | None = None
@@ -1075,11 +1116,12 @@ def run_food_duel(
 
         if winner is None:
             arena_rect = draw_duel_background(render_surface)
-            update_duel_ball(left, right, arena_rect, rng)
-            update_duel_ball(right, left, arena_rect, rng)
-            handle_duel_collision(left, right, damage, popups, duel_effects, rng)
-            apply_burn(left, popups, duel_effects)
-            apply_burn(right, popups, duel_effects)
+            if frame_index > intro_frames:
+                update_duel_ball(left, right, arena_rect, rng, audio_events, frame_index)
+                update_duel_ball(right, left, arena_rect, rng, audio_events, frame_index)
+                handle_duel_collision(left, right, damage, popups, duel_effects, audio_events, frame_index, rng)
+                apply_burn(left, popups, duel_effects, audio_events, frame_index)
+                apply_burn(right, popups, duel_effects, audio_events, frame_index)
 
             if left.hp <= 0 or right.hp <= 0:
                 winner, loser = (left, right) if left.hp > right.hp else (right, left)
@@ -1090,6 +1132,7 @@ def run_food_duel(
             draw_duel_effects(render_surface, duel_effects)
             draw_duel_ball(render_surface, left, ball_font)
             draw_duel_ball(render_surface, right, ball_font)
+            draw_duel_intro(render_surface, frame_index, intro_frames)
 
             for popup in popups:
                 progress = 1 - (popup.frames_left / POPUP_FRAMES)
@@ -1157,6 +1200,7 @@ def run_food_duel(
         "video_height": HEIGHT,
         "random_seed": seed,
         "output_name": output_name,
+        "audio_events": [{"frame": event.frame, "kind": event.kind} for event in audio_events],
     }
     write_result(result)
     print(json.dumps(result, indent=2))

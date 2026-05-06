@@ -7,12 +7,15 @@ import subprocess
 import sys
 from pathlib import Path
 
+import audio
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "configs" / "boss_battle_001.json"
 FRAMES_DIR = PROJECT_ROOT / "output" / "frames"
 VIDEOS_DIR = PROJECT_ROOT / "output" / "videos"
 METADATA_DIR = PROJECT_ROOT / "output" / "metadata"
+PROJECT_AUDIO_DIR = PROJECT_ROOT / "output" / "audio"
 RESULT_PATH = METADATA_DIR / "simulation_result.json"
 INPUT_PATTERN = FRAMES_DIR / "frame_%06d.png"
 DEFAULT_OUTPUT_NAME = "simulation_001"
@@ -71,6 +74,7 @@ def load_video_config(path: Path | None) -> tuple[dict, Path | None]:
         "duel_left_hp": 240,
         "duel_right_hp": 260,
         "duel_ball_radius": 118,
+        "audio_enabled": True,
     }
     config_path = resolve_config_path(path)
     if config_path is not None:
@@ -89,6 +93,8 @@ def make_video(config: dict) -> Path:
     ensure_frames_exist()
     VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
     output_video = VIDEOS_DIR / f"{config['output_name']}.mp4"
+    result = load_result()
+    audio_path = audio.generate_audio(config, result)
 
     command = [
         ffmpeg_path,
@@ -97,16 +103,22 @@ def make_video(config: dict) -> Path:
         str(config["fps"]),
         "-i",
         str(INPUT_PATTERN),
-        "-c:v",
-        "libx264",
-        "-pix_fmt",
-        "yuv420p",
-        "-vf",
-        f"scale={config['video_width']}:{config['video_height']}:flags=lanczos",
-        "-movflags",
-        "+faststart",
-        str(output_video),
     ]
+    if audio_path is not None:
+        command.extend(["-i", str(audio_path)])
+    command.extend(
+        [
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-vf",
+            f"scale={config['video_width']}:{config['video_height']}:flags=lanczos",
+        ]
+    )
+    if audio_path is not None:
+        command.extend(["-c:a", "aac", "-b:a", "128k", "-shortest"])
+    command.extend(["-movflags", "+faststart", str(output_video)])
 
     subprocess.run(command, check=True)
     return output_video
@@ -226,6 +238,9 @@ def write_youtube_metadata(config: dict, config_path: Path | None, video_path: P
         "description": description,
         "tags": tags,
         "video_file": relative_path(video_path),
+        "audio_file": relative_path(PROJECT_AUDIO_DIR / f"{config['output_name']}.wav")
+        if config.get("audio_enabled", True)
+        else None,
         "config_file": relative_path(config_path) if config_path is not None else None,
         "result": result,
         "duration_seconds": config["duration_seconds"],
