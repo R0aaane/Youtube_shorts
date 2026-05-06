@@ -62,6 +62,9 @@ def load_video_config(path: Path | None) -> tuple[dict, Path | None]:
         "duration_seconds": 10,
         "boss_hp": 10000,
         "initial_ball_count": 10,
+        "theme": "boss_battle",
+        "fibonacci_count": 50,
+        "exponential_count": 50,
     }
     config_path = resolve_config_path(path)
     if config_path is not None:
@@ -114,6 +117,9 @@ def load_result() -> dict:
 
 
 def build_title(config: dict, result: dict) -> str:
+    if config.get("theme") == "fibonacci_vs_exponential":
+        return "100 Fibonacci VS Exponential Balls"
+
     ball_count = config["initial_ball_count"]
     boss_hp = config["boss_hp"]
     status = result.get("status")
@@ -134,7 +140,7 @@ def write_youtube_metadata(config: dict, config_path: Path | None, video_path: P
         "title": build_title(config, result),
         "description": (
             f"{config['initial_ball_count']} evolving physics balls battle a "
-            f"{config['boss_hp']:,} HP boss. Result: {status}. "
+            f"{config['boss_hp']:,} HP wall. Result: {status}. "
             f"Total damage: {total_damage}. Remaining HP: {boss_hp_end}. #shorts"
         ),
         "tags": [
@@ -145,6 +151,9 @@ def write_youtube_metadata(config: dict, config_path: Path | None, video_path: P
             "pygame",
             "boss battle",
             "evolving balls",
+            "fibonacci",
+            "exponential",
+            "math balls",
         ],
         "video_file": relative_path(video_path),
         "config_file": relative_path(config_path) if config_path is not None else None,

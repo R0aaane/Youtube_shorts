@@ -110,6 +110,14 @@ Use this command to run the full local pipeline from one config:
 python src/generate_video.py --config configs/boss_battle_001.json
 ```
 
+Reference-style number battle:
+
+```powershell
+python src/generate_video.py --config configs/fibonacci_vs_exponential.json
+```
+
+This creates a vertical "100 Fibonacci VS Exponential" simulation with 50 Fibonacci-number balls and 50 exponential-number balls attacking a shared HP wall.
+
 It runs these steps in order:
 
 1. Generate PNG frames

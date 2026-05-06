@@ -41,6 +41,7 @@ def generate(config_path: Path, show_window: bool) -> tuple[Path, Path]:
         fps=simulation_config.fps,
         item_spawn_interval=simulation_config.item_spawn_interval,
         output_name=simulation_config.output_name,
+        config=simulation_config,
     )
 
     print("[2/3] Encoding MP4...")

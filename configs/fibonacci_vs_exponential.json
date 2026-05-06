@@ -1,0 +1,15 @@
+{
+  "video_width": 1080,
+  "video_height": 1920,
+  "fps": 60,
+  "duration_seconds": 12,
+  "initial_ball_count": 100,
+  "boss_hp": 120000,
+  "base_damage": 1,
+  "item_spawn_interval": 90,
+  "random_seed": 815,
+  "output_name": "fibonacci_vs_exponential",
+  "theme": "fibonacci_vs_exponential",
+  "fibonacci_count": 50,
+  "exponential_count": 50
+}

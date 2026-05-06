@@ -51,6 +51,9 @@ class SimulationConfig:
     item_spawn_interval: int = 75
     random_seed: int = 1
     output_name: str = "simulation_001"
+    theme: str = "boss_battle"
+    fibonacci_count: int = 50
+    exponential_count: int = 50
 
     @property
     def frame_count(self) -> int:
@@ -68,6 +71,9 @@ DEFAULT_CONFIG = {
     "item_spawn_interval": 75,
     "random_seed": 1,
     "output_name": "simulation_001",
+    "theme": "boss_battle",
+    "fibonacci_count": 50,
+    "exponential_count": 50,
 }
 
 
@@ -76,6 +82,9 @@ class BallState:
     ball_id: int
     body: pymunk.Body
     damage: int
+    team: str = "boss"
+    label: str = ""
+    color: tuple[int, int, int] = (68, 180, 255)
     hit_cooldown: int = 0
     damage_level: int = 0
     speed_level: int = 0
@@ -148,11 +157,22 @@ def add_walls(space: pymunk.Space) -> None:
     space.add(*walls)
 
 
-def add_ball(space: pymunk.Space, rng: random.Random, damage: int, ball_id: int) -> BallState:
+def add_ball(
+    space: pymunk.Space,
+    rng: random.Random,
+    damage: int,
+    ball_id: int,
+    *,
+    team: str = "boss",
+    label: str = "",
+    color: tuple[int, int, int] = (68, 180, 255),
+    x_range: tuple[int, int] | None = None,
+) -> BallState:
     mass = 1.0
     moment = pymunk.moment_for_circle(mass, 0, BALL_RADIUS)
     body = pymunk.Body(mass, moment)
-    body.position = rng.randint(BALL_RADIUS + 40, WIDTH - BALL_RADIUS - 40), rng.randint(620, HEIGHT - BALL_RADIUS - 80)
+    min_x, max_x = x_range if x_range is not None else (BALL_RADIUS + 40, WIDTH - BALL_RADIUS - 40)
+    body.position = rng.randint(min_x, max_x), rng.randint(620, HEIGHT - BALL_RADIUS - 80)
 
     speed = rng.randint(520, 920)
     direction = pygame.Vector2(rng.uniform(-1.0, 1.0), rng.uniform(-1.0, 1.0))
@@ -165,7 +185,68 @@ def add_ball(space: pymunk.Space, rng: random.Random, damage: int, ball_id: int)
     shape.elasticity = 1.0
     shape.friction = 0.0
     space.add(body, shape)
-    return BallState(ball_id=ball_id, body=body, damage=damage)
+    return BallState(ball_id=ball_id, body=body, damage=damage, team=team, label=label, color=color)
+
+
+def compact_number(value: int) -> str:
+    if value >= 1_000_000:
+        return f"{value / 1_000_000:.1f}M"
+    if value >= 1_000:
+        return f"{value / 1_000:.1f}K"
+    return str(value)
+
+
+def fibonacci_values(count: int, base_damage: int) -> list[int]:
+    values = []
+    a, b = 1, 1
+    for _ in range(count):
+        values.append(max(1, a * base_damage))
+        a, b = b, min(a + b, 999)
+    return values
+
+
+def exponential_values(count: int, base_damage: int) -> list[int]:
+    return [max(1, min(base_damage * (2 ** index), base_damage * 999)) for index in range(count)]
+
+
+def create_balls(space: pymunk.Space, rng: random.Random, config: SimulationConfig, damage: int) -> list[BallState]:
+    if config.theme != "fibonacci_vs_exponential":
+        return [add_ball(space, rng, damage, ball_id=index + 1) for index in range(config.initial_ball_count)]
+
+    balls: list[BallState] = []
+    left_range = (BALL_RADIUS + 46, WIDTH // 2 - BALL_RADIUS - 24)
+    right_range = (WIDTH // 2 + BALL_RADIUS + 24, WIDTH - BALL_RADIUS - 46)
+
+    for index, value in enumerate(fibonacci_values(config.fibonacci_count, damage), start=1):
+        balls.append(
+            add_ball(
+                space,
+                rng,
+                value,
+                ball_id=index,
+                team="fibonacci",
+                label=compact_number(value),
+                color=(255, 213, 83),
+                x_range=left_range,
+            )
+        )
+
+    offset = len(balls)
+    for index, value in enumerate(exponential_values(config.exponential_count, damage), start=1):
+        balls.append(
+            add_ball(
+                space,
+                rng,
+                value,
+                ball_id=offset + index,
+                team="exponential",
+                label=compact_number(value),
+                color=(89, 211, 255),
+                x_range=right_range,
+            )
+        )
+
+    return balls
 
 
 def clear_frames_dir() -> None:
@@ -351,9 +432,15 @@ def draw(
     item_font = pygame.font.SysFont("arial", 26, bold=True)
     popup_font = pygame.font.SysFont("arial", 42, bold=True)
     status_font = pygame.font.SysFont("arial", 86, bold=True)
+    team_font = pygame.font.SysFont("arial", 48, bold=True)
 
     surface.blit(background, (0, 0))
     pygame.draw.rect(surface, (230, 236, 242), surface.get_rect(), width=WALL_THICKNESS)
+
+    if any(ball.team in {"fibonacci", "exponential"} for ball in balls):
+        pygame.draw.line(surface, (238, 244, 250), (WIDTH // 2, BOSS_RECT.bottom + 40), (WIDTH // 2, HEIGHT - 70), 3)
+        draw_text_with_shadow(surface, team_font, "FIBONACCI", (WIDTH // 4, BOSS_RECT.bottom + 58), (255, 213, 83))
+        draw_text_with_shadow(surface, team_font, "EXPONENTIAL", (WIDTH * 3 // 4, BOSS_RECT.bottom + 58), (89, 211, 255))
 
     boss_shadow = BOSS_RECT.move(0, 10)
     pygame.draw.rect(surface, (52, 20, 34), boss_shadow, border_radius=18)
@@ -361,7 +448,8 @@ def draw(
     boss_inner = BOSS_RECT.inflate(-28, -28)
     pygame.draw.rect(surface, (214, 72, 88), boss_inner, border_radius=10)
     pygame.draw.rect(surface, (230, 236, 242), BOSS_RECT, width=5, border_radius=14)
-    draw_text_with_shadow(surface, title_font, "HP BOSS", BOSS_RECT.center, (255, 245, 230))
+    boss_title = "NUMBER HP WALL" if any(ball.team in {"fibonacci", "exponential"} for ball in balls) else "HP BOSS"
+    draw_text_with_shadow(surface, title_font, boss_title, BOSS_RECT.center, (255, 245, 230))
 
     hp_ratio = boss_hp / boss_max_hp if boss_max_hp > 0 else 0
     hp_ratio = max(0.0, min(1.0, hp_ratio))
@@ -387,10 +475,11 @@ def draw(
         position = (round(ball.body.position.x), round(ball.body.position.y))
         pygame.draw.circle(surface, (8, 16, 28), (position[0] + 5, position[1] + 7), BALL_RADIUS + 3)
         pygame.draw.circle(surface, (245, 250, 255), position, BALL_RADIUS + 5)
-        pygame.draw.circle(surface, (68, 180, 255), position, BALL_RADIUS)
-        pygame.draw.circle(surface, (113, 218, 255), (position[0] - 9, position[1] - 10), max(8, BALL_RADIUS // 3))
+        pygame.draw.circle(surface, ball.color, position, BALL_RADIUS)
+        highlight = pygame.Color(ball.color).lerp(pygame.Color(255, 255, 255), 0.35)
+        pygame.draw.circle(surface, highlight, (position[0] - 9, position[1] - 10), max(8, BALL_RADIUS // 3))
         pygame.draw.circle(surface, (7, 20, 32), position, BALL_RADIUS, width=3)
-        draw_text(surface, item_font, str(ball.damage), position, (7, 20, 32))
+        draw_text(surface, item_font, ball.label or str(ball.damage), position, (7, 20, 32))
 
     for effect in effects:
         progress = 1 - (effect.frames_left / EFFECT_FRAMES)
@@ -467,7 +556,8 @@ def draw_result_screen(
         row_color = color if index == 0 else (238, 244, 250)
         draw_text_with_shadow(surface, font, row, (WIDTH // 2, start_y + index * row_gap), row_color)
 
-    draw_text_with_shadow(surface, small_font, "Evolving Balls vs HP Boss", (WIDTH // 2, round(HEIGHT * 0.86)), (190, 204, 224))
+    subtitle = "100 Fibonacci VS Exponential" if top_ball.team in {"fibonacci", "exponential"} else "Evolving Balls vs HP Boss"
+    draw_text_with_shadow(surface, small_font, subtitle, (WIDTH // 2, round(HEIGHT * 0.86)), (190, 204, 224))
 
 
 def parse_args() -> argparse.Namespace:
@@ -499,6 +589,7 @@ def run(
     fps: int,
     item_spawn_interval: int,
     output_name: str,
+    config: SimulationConfig | None = None,
 ) -> dict:
     if frame_count < 1:
         raise ValueError("--frames must be 1 or greater.")
@@ -530,7 +621,19 @@ def run(
     space = pymunk.Space()
     space.gravity = 0, 0
     add_walls(space)
-    balls = [add_ball(space, rng, damage, ball_id=index + 1) for index in range(ball_count)]
+    run_config = config or SimulationConfig(
+        video_width=WIDTH,
+        video_height=HEIGHT,
+        fps=fps,
+        duration_seconds=max(1, frame_count // fps),
+        initial_ball_count=ball_count,
+        boss_hp=boss_max_hp,
+        base_damage=damage,
+        item_spawn_interval=item_spawn_interval,
+        random_seed=seed,
+        output_name=output_name,
+    )
+    balls = create_balls(space, rng, run_config, damage)
     items: list[Item] = []
     effects: list[Effect] = []
     popups: list[DamagePopup] = []
@@ -647,6 +750,10 @@ def run(
         "boss_hp_end": boss_hp,
         "base_damage": damage,
         "ball_count": ball_count,
+        "actual_ball_count": len(balls),
+        "theme": run_config.theme,
+        "fibonacci_count": run_config.fibonacci_count if run_config.theme == "fibonacci_vs_exponential" else 0,
+        "exponential_count": run_config.exponential_count if run_config.theme == "fibonacci_vs_exponential" else 0,
         "total_damage": total_damage,
         "damage_up_collected": damage_up_count,
         "speed_up_collected": speed_up_count,
@@ -704,6 +811,7 @@ def main() -> None:
         fps=config.fps,
         item_spawn_interval=config.item_spawn_interval,
         output_name=config.output_name,
+        config=config,
     )
 
 
