@@ -32,31 +32,62 @@ def add_tone(samples: list[float], start_seconds: float, duration: float, freque
         samples[target] += math.sin(2 * math.pi * frequency * index / SAMPLE_RATE) * volume * envelope
 
 
-def add_noise_hit(samples: list[float], start_seconds: float, duration: float, volume: float) -> None:
+def add_noise_hit(samples: list[float], start_seconds: float, duration: float, volume: float, *, seed: int = 17, lowpass: float = 0.35) -> None:
     start = max(0, round(start_seconds * SAMPLE_RATE))
     length = max(1, round(duration * SAMPLE_RATE))
-    seed = 17
+    filtered = 0.0
     for index in range(length):
         target = start + index
         if target >= len(samples):
             break
         seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF
         noise = ((seed / 0x7FFFFFFF) * 2) - 1
+        filtered += (noise - filtered) * lowpass
         progress = index / length
-        envelope = (1 - progress) ** 2
-        samples[target] += noise * volume * envelope
+        envelope = min(1.0, progress * 18) * ((1 - progress) ** 2.3)
+        samples[target] += filtered * volume * envelope
+
+
+def add_thump(samples: list[float], start_seconds: float, *, volume: float = 0.22, heavy: bool = False) -> None:
+    base = 58 if heavy else 92
+    duration = 0.19 if heavy else 0.11
+    add_tone(samples, start_seconds, duration, base, volume)
+    add_tone(samples, start_seconds + 0.012, duration * 0.7, base * 1.55, volume * 0.28)
+    add_noise_hit(samples, start_seconds, duration * 0.8, volume * (0.72 if heavy else 0.48), seed=1203 if heavy else 412, lowpass=0.18)
+
+
+def add_splat(samples: list[float], start_seconds: float, *, volume: float = 0.18) -> None:
+    add_noise_hit(samples, start_seconds, 0.16, volume, seed=876, lowpass=0.22)
+    add_tone(samples, start_seconds + 0.02, 0.12, 145, volume * 0.45)
+    add_tone(samples, start_seconds + 0.055, 0.09, 112, volume * 0.28)
+
+
+def add_sizzle(samples: list[float], start_seconds: float, *, volume: float = 0.09) -> None:
+    add_noise_hit(samples, start_seconds, 0.22, volume, seed=2219, lowpass=0.72)
+    add_noise_hit(samples, start_seconds + 0.05, 0.16, volume * 0.55, seed=591, lowpass=0.86)
+
+
+def add_crunch(samples: list[float], start_seconds: float, *, volume: float = 0.12) -> None:
+    for offset, seed in [(0.0, 33), (0.025, 3401), (0.055, 780)]:
+        add_noise_hit(samples, start_seconds + offset, 0.045, volume, seed=seed, lowpass=0.62)
+    add_tone(samples, start_seconds + 0.02, 0.05, 240, volume * 0.35)
+
+
+def add_kitchen_ding(samples: list[float], start_seconds: float, *, volume: float = 0.12) -> None:
+    add_tone(samples, start_seconds, 0.42, 1046, volume)
+    add_tone(samples, start_seconds + 0.015, 0.38, 1568, volume * 0.38)
 
 
 def add_arcade_call(samples: list[float], start_seconds: float, word: str) -> None:
     if word == "ready":
-        notes = [(392, 0.0), (494, 0.12), (659, 0.24)]
-        duration = 0.28
+        notes = [(330, 0.0), (392, 0.11), (494, 0.22)]
+        duration = 0.16
     else:
-        notes = [(220, 0.0), (440, 0.08), (880, 0.16)]
-        duration = 0.34
+        notes = [(196, 0.0), (294, 0.06), (392, 0.12)]
+        duration = 0.18
     for frequency, offset in notes:
-        add_tone(samples, start_seconds + offset, duration, frequency, 0.26)
-        add_tone(samples, start_seconds + offset, duration, frequency * 1.5, 0.08)
+        add_tone(samples, start_seconds + offset, duration, frequency, 0.12)
+    add_noise_hit(samples, start_seconds, 0.18, 0.045, seed=913, lowpass=0.24)
 
 
 def add_event_sound(samples: list[float], kind: str, seconds: float) -> None:
@@ -64,37 +95,41 @@ def add_event_sound(samples: list[float], kind: str, seconds: float) -> None:
         add_arcade_call(samples, seconds, "ready")
     elif kind == "fight":
         add_arcade_call(samples, seconds, "fight")
-        add_noise_hit(samples, seconds + 0.05, 0.18, 0.25)
+        add_thump(samples, seconds + 0.05, volume=0.16)
     elif kind == "impact":
-        add_tone(samples, seconds, 0.11, 120, 0.22)
-        add_noise_hit(samples, seconds, 0.09, 0.18)
+        add_thump(samples, seconds, volume=0.13)
+    elif kind == "soft_hit":
+        add_thump(samples, seconds, volume=0.11)
+    elif kind == "heavy_hit":
+        add_thump(samples, seconds, volume=0.2, heavy=True)
+        add_splat(samples, seconds + 0.018, volume=0.12)
+    elif kind == "big_hit":
+        add_thump(samples, seconds, volume=0.27, heavy=True)
+        add_splat(samples, seconds + 0.012, volume=0.18)
     elif kind == "burn":
-        add_tone(samples, seconds, 0.28, 360, 0.18)
-        add_tone(samples, seconds, 0.28, 720, 0.08)
-        add_noise_hit(samples, seconds, 0.18, 0.08)
+        add_sizzle(samples, seconds, volume=0.1)
     elif kind == "fire_tick":
-        add_tone(samples, seconds, 0.08, 620, 0.14)
+        add_sizzle(samples, seconds, volume=0.07)
     elif kind == "cheese_shot":
-        add_tone(samples, seconds, 0.12, 540, 0.16)
-        add_tone(samples, seconds + 0.04, 0.12, 760, 0.12)
+        add_splat(samples, seconds, volume=0.13)
+        add_noise_hit(samples, seconds + 0.06, 0.09, 0.07, seed=1468, lowpass=0.28)
     elif kind == "cheese_stick":
-        add_tone(samples, seconds, 0.16, 310, 0.18)
-        add_noise_hit(samples, seconds, 0.08, 0.08)
+        add_splat(samples, seconds, volume=0.16)
     elif kind == "cheese_tick":
-        add_tone(samples, seconds, 0.07, 690, 0.13)
+        add_sizzle(samples, seconds, volume=0.075)
     elif kind == "ingredient_spawn":
-        add_tone(samples, seconds, 0.14, 260, 0.16)
-        add_tone(samples, seconds + 0.06, 0.14, 420, 0.13)
+        add_crunch(samples, seconds, volume=0.105)
     elif kind == "ingredient_hit":
-        add_tone(samples, seconds, 0.1, 180, 0.18)
-        add_noise_hit(samples, seconds, 0.07, 0.12)
+        add_crunch(samples, seconds, volume=0.12)
+        add_thump(samples, seconds + 0.01, volume=0.11)
     elif kind == "charge_start":
-        add_tone(samples, seconds, 0.22, 180, 0.18)
-        add_tone(samples, seconds + 0.04, 0.22, 520, 0.16)
+        add_noise_hit(samples, seconds, 0.18, 0.1, seed=7001, lowpass=0.2)
+        add_tone(samples, seconds, 0.18, 118, 0.09)
     elif kind == "charge_hit":
-        add_tone(samples, seconds, 0.16, 92, 0.28)
-        add_tone(samples, seconds, 0.13, 780, 0.18)
-        add_noise_hit(samples, seconds, 0.14, 0.25)
+        add_thump(samples, seconds, volume=0.29, heavy=True)
+        add_splat(samples, seconds + 0.012, volume=0.18)
+    elif kind in {"victory", "win"}:
+        add_kitchen_ding(samples, seconds)
 
 
 def write_wav(samples: list[float], path: Path) -> None:

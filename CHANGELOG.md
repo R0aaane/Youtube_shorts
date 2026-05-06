@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## 0.15.0 - 2026-05-07
+
+### Added
+
+- Added damage-scaled food duel popups with longer/larger strong hits and `BIG HIT!` callouts for 50+ damage.
+- Added stronger shockwave and screen shake treatment for high-damage food duel hits.
+
+### Changed
+
+- Reworked synthesized food duel sound effects toward softer thumps, squish impacts, cheese splats, melt sizzles, ingredient crunches, and a short victory ding.
+- Updated food duel documentation for the food-themed audio and damage popup behavior.
+
 ## 0.14.1 - 2026-05-07
 
 ### Changed

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass, field
 import json
+import math
 import random
 from pathlib import Path
 
@@ -142,6 +143,9 @@ class DamagePopup:
     position: pygame.Vector2
     frames_left: int = POPUP_FRAMES
     color: tuple[int, int, int] = (255, 238, 96)
+    total_frames: int = POPUP_FRAMES
+    scale: float = 1.0
+    label: str = ""
 
 
 @dataclass
@@ -178,6 +182,29 @@ class DuelEffect:
 class AudioEvent:
     frame: int
     kind: str
+
+
+def damage_popup_style(amount: int) -> tuple[int, float, str]:
+    if amount >= 50:
+        return 72, 1.55, "BIG HIT!"
+    if amount >= 25:
+        return 58, 1.25, ""
+    if amount >= 10:
+        return 46, 1.0, ""
+    return 30, 0.72, ""
+
+
+def make_damage_popup(amount: int, position: pygame.Vector2, color: tuple[int, int, int]) -> DamagePopup:
+    frames, scale, label = damage_popup_style(amount)
+    return DamagePopup(amount=amount, position=position, frames_left=frames, color=color, total_frames=frames, scale=scale, label=label)
+
+
+def damage_audio_kind(amount: int) -> str:
+    if amount >= 50:
+        return "big_hit"
+    if amount >= 25:
+        return "heavy_hit"
+    return "soft_hit"
 
 
 @dataclass
@@ -704,10 +731,10 @@ def draw(
         pygame.draw.circle(surface, color, (round(effect.position.x), round(effect.position.y)), radius, width=5)
 
     for popup in popups:
-        progress = 1 - (popup.frames_left / POPUP_FRAMES)
-        y_offset = round(progress * 62)
+        progress = 1 - (popup.frames_left / max(1, popup.total_frames))
+        y_offset = round(progress * 62 * popup.scale)
         center = (round(popup.position.x), round(popup.position.y) - y_offset)
-        draw_text_with_shadow(surface, popup_font, f"-{popup.amount}", center, (255, 230, 95))
+        draw_text_with_shadow(surface, popup_font, f"-{popup.amount}", center, popup.color)
 
     if status is not None:
         color = (104, 232, 143) if status == CLEAR else (255, 105, 105)
@@ -1422,7 +1449,7 @@ def update_cheese_patches(
             target.hp -= dealt
             total_damage += dealt
             position = target.position + patch.offset.rotate(target.visual_angle)
-            popups.append(DamagePopup(amount=dealt, position=position, color=duel_attack_color("pizza")))
+            popups.append(make_damage_popup(dealt, position, duel_attack_color("pizza")))
             effects.append(DuelEffect("cheese", position, 18, duel_attack_color("pizza"), "MELT"))
             audio_events.append(AudioEvent(frame_index, "cheese_tick"))
         if patch.frames_left > 0 and target.hp > 0:
@@ -1461,9 +1488,13 @@ def update_ingredient_allies(
             dealt = min(target.hp, ally.hp)
             target.hp -= dealt
             ally.hp = 0
-            popups.append(DamagePopup(amount=dealt, position=target.position.copy(), color=duel_attack_color("burger")))
+            popups.append(make_damage_popup(dealt, target.position.copy(), duel_attack_color("burger")))
             effects.append(DuelEffect("ingredient", ally.position.copy(), 24, duel_attack_color("burger"), ally.kind.upper()))
+            if dealt >= 25:
+                effect_frames = 34 if dealt >= 50 else 28
+                effects.append(DuelEffect("impact", target.position.copy(), effect_frames, duel_attack_color("burger"), "BIG HIT!" if dealt >= 50 else ""))
             audio_events.append(AudioEvent(frame_index, "ingredient_hit"))
+            audio_events.append(AudioEvent(frame_index, damage_audio_kind(dealt)))
             ally.hit_cooldown = 42
             total_damage += dealt
 
@@ -1482,12 +1513,12 @@ def handle_duel_collision(
     audio_events: list[AudioEvent],
     frame_index: int,
     rng: random.Random,
-) -> tuple[bool, bool]:
+) -> tuple[bool, bool, int]:
     delta = right.position - left.position
     distance = delta.length()
     min_distance = left.radius + right.radius
     if distance <= 0 or distance >= min_distance:
-        return False, False
+        return False, False, 0
 
     normal = delta.normalize()
     overlap = min_distance - distance
@@ -1500,6 +1531,7 @@ def handle_duel_collision(
     audio_events.append(AudioEvent(frame_index, "impact"))
     hit_landed = False
     burger_charge_hit = False
+    max_damage = 0
 
     if left.hit_cooldown == 0:
         was_burger_charge = left.skin == "burger" and left.charge_frames > 0
@@ -1508,9 +1540,14 @@ def handle_duel_collision(
         left.total_damage_dealt += damage
         left.hits += 1
         left.hit_cooldown = 28
-        popups.append(DamagePopup(amount=damage, position=right.position.copy(), color=duel_attack_color(left.skin)))
+        popups.append(make_damage_popup(damage, right.position.copy(), duel_attack_color(left.skin)))
+        if damage >= 25:
+            effect_frames = 34 if damage >= 50 else 28
+            effects.append(DuelEffect("impact", right.position.copy(), effect_frames, duel_attack_color(left.skin), "BIG HIT!" if damage >= 50 else ""))
+        audio_events.append(AudioEvent(frame_index, damage_audio_kind(damage)))
         hit_landed = True
         burger_charge_hit = burger_charge_hit or was_burger_charge
+        max_damage = max(max_damage, damage)
 
     if right.hit_cooldown == 0:
         was_burger_charge = right.skin == "burger" and right.charge_frames > 0
@@ -1519,10 +1556,15 @@ def handle_duel_collision(
         right.total_damage_dealt += damage
         right.hits += 1
         right.hit_cooldown = 28
-        popups.append(DamagePopup(amount=damage, position=left.position.copy(), color=duel_attack_color(right.skin)))
+        popups.append(make_damage_popup(damage, left.position.copy(), duel_attack_color(right.skin)))
+        if damage >= 25:
+            effect_frames = 34 if damage >= 50 else 28
+            effects.append(DuelEffect("impact", left.position.copy(), effect_frames, duel_attack_color(right.skin), "BIG HIT!" if damage >= 50 else ""))
+        audio_events.append(AudioEvent(frame_index, damage_audio_kind(damage)))
         hit_landed = True
         burger_charge_hit = burger_charge_hit or was_burger_charge
-    return hit_landed, burger_charge_hit
+        max_damage = max(max_damage, damage)
+    return hit_landed, burger_charge_hit, max_damage
 
 
 def draw_duel_result(
@@ -1661,6 +1703,7 @@ def run_food_duel(
             if frame_index > simulation_frame_limit:
                 winner, loser = (left, right) if left.hp >= right.hp else (right, left)
                 result_started_frame = frame_index
+                audio_events.append(AudioEvent(frame_index, "victory"))
             if winner is None and frame_index > intro_frames:
                 if hit_stop_frames <= 0:
                     update_duel_ball(
@@ -1721,25 +1764,31 @@ def run_food_duel(
                         audio_events,
                         frame_index,
                     )
-                    hit_landed, burger_charge_hit = handle_duel_collision(left, right, damage, popups, duel_effects, audio_events, frame_index, rng)
+                    hit_landed, burger_charge_hit, hit_damage = handle_duel_collision(left, right, damage, popups, duel_effects, audio_events, frame_index, rng)
                     if ally_damage > 0:
                         right.total_damage_dealt += ally_damage
                     if burger_charge_hit:
                         hit_stop_frames = 7
                         shake_frames = 16
                         shake_strength = 22
+                    elif hit_damage >= 50 or ally_damage >= 50:
+                        shake_frames = max(shake_frames, 18)
+                        shake_strength = max(shake_strength, 24)
+                    elif hit_damage >= 25 or ally_damage >= 25:
+                        shake_frames = max(shake_frames, 10)
+                        shake_strength = max(shake_strength, 13)
                     elif hit_landed:
-                        shake_frames = max(shake_frames, 7)
-                        shake_strength = max(shake_strength, 10)
+                        shake_frames = max(shake_frames, 3)
+                        shake_strength = max(shake_strength, 3)
                 else:
                     hit_stop_frames -= 1
 
             if winner is None and (left.hp <= 0 or right.hp <= 0):
                 winner, loser = (left, right) if left.hp > right.hp else (right, left)
                 result_started_frame = frame_index + 1
+                audio_events.append(AudioEvent(frame_index + 1, "victory"))
 
             ball_font = make_font(max(48, round(radius * 0.43)), bold=True)
-            popup_font = make_font(62, bold=True, italic=True)
             if winner is None:
                 draw_duel_effects(render_surface, duel_effects)
                 draw_cheese_patches(render_surface, cheese_patches, left, right)
@@ -1750,9 +1799,15 @@ def run_food_duel(
                 draw_duel_intro(render_surface, frame_index, ready_frames, intro_frames)
 
                 for popup in popups:
-                    progress = 1 - (popup.frames_left / POPUP_FRAMES)
-                    center = (round(popup.position.x), round(popup.position.y - progress * 88))
-                    draw_text_with_shadow(render_surface, popup_font, f"-{popup.amount}", center, popup.color)
+                    progress = 1 - (popup.frames_left / max(1, popup.total_frames))
+                    lift = 42 + 54 * popup.scale
+                    wobble = math.sin(progress * math.pi * 3) * 6 * popup.scale
+                    center = (round(popup.position.x + wobble), round(popup.position.y - progress * lift))
+                    dynamic_popup_font = make_font(max(28, round(50 * popup.scale)), bold=True, italic=True)
+                    draw_text_with_shadow(render_surface, dynamic_popup_font, f"-{popup.amount}", center, popup.color)
+                    if popup.label:
+                        label_font = make_font(round(28 * popup.scale), bold=True, italic=True)
+                        draw_text_with_shadow(render_surface, label_font, popup.label, (center[0], center[1] - round(42 * popup.scale)), popup.color)
                     popup.frames_left -= 1
                 popups = [popup for popup in popups if popup.frames_left > 0]
                 for effect in duel_effects:
@@ -1792,6 +1847,7 @@ def run_food_duel(
     if winner is None:
         winner, loser = (left, right) if left.hp >= right.hp else (right, left)
         result_started_frame = frames_rendered
+        audio_events.append(AudioEvent(frames_rendered, "victory"))
 
     pygame.quit()
     result = {
@@ -1968,7 +2024,7 @@ def run(
                 boss_hp, total_damage, dealt = handle_boss_collision(ball, boss_hp, total_damage)
                 if dealt > 0:
                     popup_position = pygame.Vector2(ball.body.position.x, max(HP_BAR_RECT.bottom + 70, BOSS_RECT.top - 20))
-                    popups.append(DamagePopup(amount=dealt, position=popup_position))
+                    popups.append(make_damage_popup(dealt, popup_position, (255, 230, 95)))
                 limit_ball_speed(ball)
 
             if boss_hp <= 0:
