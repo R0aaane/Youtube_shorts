@@ -1,6 +1,6 @@
 # YouTube Shorts 2D Simulation MVP
 
-1080x1920 の縦長画面で、ボールが壁に反射し続ける最小 2D 物理シミュレーションです。
+1080x1920 の縦長画面で、複数のボールが壁に反射しながら HP ボスを攻撃する 2D 物理シミュレーションです。
 
 ## セットアップ
 
@@ -18,21 +18,35 @@ python src/simulate.py --frames 600 --no-window
 
 `output/frames/` に `frame_000001.png` から PNG フレームが保存されます。既存の PNG フレームは実行前に削除されます。
 
-現在のMVPでは、画面上部にHP 10000のボスとHPバーが表示されます。ボールがボスに衝突すると10ダメージを与えます。制限フレーム内にHPが0になれば `CLEAR`、倒せなければ `FAILED` です。結果は `output/metadata/simulation_result.json` に保存されます。
+主なオプション:
+
+```powershell
+python src/simulate.py --frames 600 --no-window --balls 10 --boss-hp 10000 --damage 10 --seed 1
+```
+
+- `--balls`: 初期ボール数。デフォルトは `10`
+- `--boss-hp`: ボス初期HP。デフォルトは `10000`
+- `--damage`: 各ボールの初期ダメージ。デフォルトは `10`
+- `--seed`: ランダム生成のシード
+- `--window`: 画面に収まる縮小プレビューを表示
+- `--no-window`: ヘッドレスでフレーム生成
+
+## ボスとアイテム
+
+画面上部に HP ボス、HP バー、HP 数値を表示します。ボールがボスに衝突すると、そのボールの現在ダメージ分だけ HP が減ります。
+
+一定間隔でアイテムが出現します。ボールが触れると短いリングエフェクトが出て、ボールが強化されます。
+
+- `damage_up`: 取得したボールのダメージを増やす
+- `speed_up`: 取得したボールの速度を少し上げる
+
+制限フレーム内に HP が 0 になれば `CLEAR`、倒せなければ `FAILED` です。結果は `output/metadata/simulation_result.json` に保存されます。
 
 CLEAR確認用の短い実行例:
 
 ```powershell
-python src/simulate.py --frames 600 --no-window --boss-hp 10 --damage 10
+python src/simulate.py --frames 600 --no-window --boss-hp 100 --damage 20
 ```
-
-画面表示ありで確認する場合:
-
-```powershell
-python src/simulate.py --frames 600 --window
-```
-
-ウィンドウ表示時は、1080x1920 の生成フレームを画面に収まるよう縮小表示します。保存される PNG は 1080x1920 のままです。
 
 ## MP4 動画生成
 
@@ -68,8 +82,9 @@ output/videos/simulation_001.mp4
 - FPS: 60
 - 物理エンジン: pymunk
 - 描画: pygame-ce
-- ボール: 1 個
+- 初期ボール数: 10
 - 重力: なし
+- アイテム: `damage_up`, `speed_up`
 - フレーム出力: `output/frames/`
 - 動画出力: `output/videos/simulation_001.mp4`
 - YouTube アップロード: 未実装

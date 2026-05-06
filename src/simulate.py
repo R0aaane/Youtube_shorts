@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import json
+import random
 from pathlib import Path
 
 import pygame
@@ -17,6 +19,7 @@ WIDTH = 1080
 HEIGHT = 1920
 FPS = 60
 DEFAULT_FRAMES = 600
+DEFAULT_BALLS = 10
 BALL_RADIUS = 36
 WALL_THICKNESS = 8
 DISPLAY_SCALE = 0.4
@@ -25,8 +28,37 @@ BALL_DAMAGE = 10
 BOSS_RECT = pygame.Rect(260, 240, 560, 180)
 HP_BAR_RECT = pygame.Rect(80, 64, 920, 42)
 HIT_COOLDOWN_FRAMES = 5
+ITEM_RADIUS = 28
+ITEM_INTERVAL_FRAMES = 75
+ITEM_START_FRAME = 45
+EFFECT_FRAMES = 26
+MAX_ITEMS = 8
+MAX_BALL_SPEED = 1800
 CLEAR = "CLEAR"
 FAILED = "FAILED"
+
+
+@dataclass
+class BallState:
+    body: pymunk.Body
+    damage: int
+    hit_cooldown: int = 0
+    damage_level: int = 0
+    speed_level: int = 0
+
+
+@dataclass
+class Item:
+    kind: str
+    position: pygame.Vector2
+    radius: int = ITEM_RADIUS
+
+
+@dataclass
+class Effect:
+    kind: str
+    position: pygame.Vector2
+    frames_left: int = EFFECT_FRAMES
 
 
 def add_walls(space: pymunk.Space) -> None:
@@ -46,18 +78,24 @@ def add_walls(space: pymunk.Space) -> None:
     space.add(*walls)
 
 
-def add_ball(space: pymunk.Space) -> pymunk.Body:
+def add_ball(space: pymunk.Space, rng: random.Random, damage: int) -> BallState:
     mass = 1.0
     moment = pymunk.moment_for_circle(mass, 0, BALL_RADIUS)
     body = pymunk.Body(mass, moment)
-    body.position = WIDTH / 2, HEIGHT / 2
-    body.velocity = 520, 780
+    body.position = rng.randint(BALL_RADIUS + 40, WIDTH - BALL_RADIUS - 40), rng.randint(620, HEIGHT - BALL_RADIUS - 80)
+
+    speed = rng.randint(520, 920)
+    direction = pygame.Vector2(rng.uniform(-1.0, 1.0), rng.uniform(-1.0, 1.0))
+    if direction.length_squared() == 0:
+        direction = pygame.Vector2(1, 0)
+    direction = direction.normalize()
+    body.velocity = direction.x * speed, direction.y * speed
 
     shape = pymunk.Circle(body, BALL_RADIUS)
     shape.elasticity = 1.0
     shape.friction = 0.0
     space.add(body, shape)
-    return body
+    return BallState(body=body, damage=damage)
 
 
 def clear_frames_dir() -> None:
@@ -84,25 +122,96 @@ def circle_rect_collision(position: pymunk.Vec2d, radius: int, rect: pygame.Rect
 
 
 def handle_boss_collision(
-    ball: pymunk.Body,
+    ball: BallState,
     boss_hp: int,
-    damage: int,
-    hit_cooldown: int,
+    total_damage: int,
 ) -> tuple[int, int]:
-    collided, normal = circle_rect_collision(ball.position, BALL_RADIUS, BOSS_RECT)
+    collided, normal = circle_rect_collision(ball.body.position, BALL_RADIUS, BOSS_RECT)
     if not collided:
-        return boss_hp, max(0, hit_cooldown - 1)
+        ball.hit_cooldown = max(0, ball.hit_cooldown - 1)
+        return boss_hp, total_damage
 
-    velocity = pygame.Vector2(ball.velocity.x, ball.velocity.y)
+    velocity = pygame.Vector2(ball.body.velocity.x, ball.body.velocity.y)
     if velocity.dot(normal) < 0:
         reflected = velocity.reflect(normal)
-        ball.velocity = reflected.x, reflected.y
+        ball.body.velocity = reflected.x, reflected.y
 
-    ball.position = ball.position.x + normal.x * 8, ball.position.y + normal.y * 8
-    if hit_cooldown > 0:
-        return boss_hp, hit_cooldown - 1
+    ball.body.position = ball.body.position.x + normal.x * 8, ball.body.position.y + normal.y * 8
+    if ball.hit_cooldown > 0:
+        ball.hit_cooldown -= 1
+        return boss_hp, total_damage
 
-    return max(0, boss_hp - damage), HIT_COOLDOWN_FRAMES
+    ball.hit_cooldown = HIT_COOLDOWN_FRAMES
+    dealt = min(boss_hp, ball.damage)
+    return max(0, boss_hp - dealt), total_damage + dealt
+
+
+def clamp_to_arena(position: pygame.Vector2) -> pygame.Vector2:
+    return pygame.Vector2(
+        max(BALL_RADIUS + 60, min(WIDTH - BALL_RADIUS - 60, position.x)),
+        max(BOSS_RECT.bottom + 80, min(HEIGHT - BALL_RADIUS - 80, position.y)),
+    )
+
+
+def spawn_item(rng: random.Random, balls: list[BallState], item_index: int) -> Item:
+    source_ball = rng.choice(balls)
+    source_position = pygame.Vector2(source_ball.body.position.x, source_ball.body.position.y)
+    offset = pygame.Vector2(rng.randint(-24, 24), rng.randint(-24, 24))
+    kind = "damage_up" if item_index % 2 == 0 else "speed_up"
+    return Item(kind=kind, position=clamp_to_arena(source_position + offset))
+
+
+def limit_ball_speed(ball: BallState) -> None:
+    velocity = pygame.Vector2(ball.body.velocity.x, ball.body.velocity.y)
+    if velocity.length() > MAX_BALL_SPEED:
+        velocity.scale_to_length(MAX_BALL_SPEED)
+        ball.body.velocity = velocity.x, velocity.y
+
+
+def apply_item(ball: BallState, item: Item) -> None:
+    if item.kind == "damage_up":
+        ball.damage += 5
+        ball.damage_level += 1
+        return
+
+    velocity = pygame.Vector2(ball.body.velocity.x, ball.body.velocity.y)
+    if velocity.length_squared() == 0:
+        velocity = pygame.Vector2(600, 0)
+    velocity *= 1.14
+    if velocity.length() > MAX_BALL_SPEED:
+        velocity.scale_to_length(MAX_BALL_SPEED)
+    ball.body.velocity = velocity.x, velocity.y
+    ball.speed_level += 1
+
+
+def handle_item_collisions(
+    balls: list[BallState],
+    items: list[Item],
+    effects: list[Effect],
+) -> tuple[int, int]:
+    damage_up_count = 0
+    speed_up_count = 0
+    remaining_items = []
+
+    for item in items:
+        collected = False
+        for ball in balls:
+            ball_position = pygame.Vector2(ball.body.position.x, ball.body.position.y)
+            if ball_position.distance_to(item.position) > BALL_RADIUS + item.radius:
+                continue
+
+            apply_item(ball, item)
+            effects.append(Effect(kind=item.kind, position=item.position.copy()))
+            damage_up_count += int(item.kind == "damage_up")
+            speed_up_count += int(item.kind == "speed_up")
+            collected = True
+            break
+
+        if not collected:
+            remaining_items.append(item)
+
+    items[:] = remaining_items
+    return damage_up_count, speed_up_count
 
 
 def draw_text(surface: pygame.Surface, font: pygame.font.Font, text: str, center: tuple[int, int], color: tuple[int, int, int]) -> None:
@@ -111,9 +220,24 @@ def draw_text(surface: pygame.Surface, font: pygame.font.Font, text: str, center
     surface.blit(text_surface, text_rect)
 
 
-def draw(surface: pygame.Surface, ball: pymunk.Body, boss_hp: int, boss_max_hp: int, status: str | None) -> None:
+def item_color(kind: str) -> tuple[int, int, int]:
+    if kind == "damage_up":
+        return (255, 108, 95)
+    return (99, 220, 156)
+
+
+def draw(
+    surface: pygame.Surface,
+    balls: list[BallState],
+    items: list[Item],
+    effects: list[Effect],
+    boss_hp: int,
+    boss_max_hp: int,
+    status: str | None,
+) -> None:
     title_font = pygame.font.SysFont("arial", 48, bold=True)
     hp_font = pygame.font.SysFont("arial", 36, bold=True)
+    item_font = pygame.font.SysFont("arial", 24, bold=True)
     status_font = pygame.font.SysFont("arial", 86, bold=True)
 
     surface.fill((15, 18, 24))
@@ -131,12 +255,24 @@ def draw(surface: pygame.Surface, ball: pymunk.Body, boss_hp: int, boss_max_hp: 
     pygame.draw.rect(surface, (230, 236, 242), HP_BAR_RECT, width=4, border_radius=10)
     draw_text(surface, hp_font, f"HP {boss_hp}/{boss_max_hp}", HP_BAR_RECT.center, (255, 255, 255))
 
-    pygame.draw.circle(
-        surface,
-        (68, 180, 255),
-        (round(ball.position.x), round(ball.position.y)),
-        BALL_RADIUS,
-    )
+    for item in items:
+        color = item_color(item.kind)
+        pygame.draw.circle(surface, color, (round(item.position.x), round(item.position.y)), item.radius)
+        pygame.draw.circle(surface, (255, 255, 255), (round(item.position.x), round(item.position.y)), item.radius, width=3)
+        label = "DMG" if item.kind == "damage_up" else "SPD"
+        draw_text(surface, item_font, label, (round(item.position.x), round(item.position.y)), (20, 24, 30))
+
+    for ball in balls:
+        position = (round(ball.body.position.x), round(ball.body.position.y))
+        pygame.draw.circle(surface, (68, 180, 255), position, BALL_RADIUS)
+        pygame.draw.circle(surface, (210, 242, 255), position, BALL_RADIUS, width=3)
+        draw_text(surface, item_font, str(ball.damage), position, (7, 20, 32))
+
+    for effect in effects:
+        progress = 1 - (effect.frames_left / EFFECT_FRAMES)
+        radius = round(34 + progress * 48)
+        color = item_color(effect.kind)
+        pygame.draw.circle(surface, color, (round(effect.position.x), round(effect.position.y)), radius, width=5)
 
     if status is not None:
         color = (104, 232, 143) if status == CLEAR else (255, 105, 105)
@@ -146,8 +282,10 @@ def draw(surface: pygame.Surface, ball: pymunk.Body, boss_hp: int, boss_max_hp: 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render a minimal 2D ball simulation.")
     parser.add_argument("--frames", type=int, default=DEFAULT_FRAMES, help="Number of frames to simulate and save.")
+    parser.add_argument("--balls", type=int, default=DEFAULT_BALLS, help="Initial number of balls.")
     parser.add_argument("--boss-hp", type=int, default=BOSS_MAX_HP, help="Initial boss HP.")
     parser.add_argument("--damage", type=int, default=BALL_DAMAGE, help="Damage dealt when the ball hits the boss.")
+    parser.add_argument("--seed", type=int, default=1, help="Random seed for reproducible simulations.")
     window_group = parser.add_mutually_exclusive_group()
     window_group.add_argument("--window", action="store_true", help="Show a scaled preview window while generating.")
     window_group.add_argument("--no-window", action="store_true", help="Generate frames without opening a window.")
@@ -159,9 +297,11 @@ def write_result(result: dict) -> None:
     RESULT_PATH.write_text(json.dumps(result, indent=2), encoding="utf-8")
 
 
-def run(frame_count: int, show_window: bool, boss_max_hp: int, damage: int) -> dict:
+def run(frame_count: int, show_window: bool, ball_count: int, boss_max_hp: int, damage: int, seed: int) -> dict:
     if frame_count < 1:
         raise ValueError("--frames must be 1 or greater.")
+    if ball_count < 1:
+        raise ValueError("--balls must be 1 or greater.")
     if boss_max_hp < 1:
         raise ValueError("--boss-hp must be 1 or greater.")
     if damage < 1:
@@ -179,14 +319,20 @@ def run(frame_count: int, show_window: bool, boss_max_hp: int, damage: int) -> d
 
     clear_frames_dir()
 
+    rng = random.Random(seed)
     space = pymunk.Space()
     space.gravity = 0, 0
     add_walls(space)
-    ball = add_ball(space)
+    balls = [add_ball(space, rng, damage) for _ in range(ball_count)]
+    items: list[Item] = []
+    effects: list[Effect] = []
     boss_hp = boss_max_hp
     status = None
-    hit_cooldown = 0
     frames_rendered = 0
+    total_damage = 0
+    damage_up_count = 0
+    speed_up_count = 0
+    item_spawn_count = 0
 
     for frame_index in range(1, frame_count + 1):
         for event in pygame.event.get():
@@ -196,19 +342,36 @@ def run(frame_count: int, show_window: bool, boss_max_hp: int, damage: int) -> d
                     "status": "STOPPED",
                     "boss_hp_start": boss_max_hp,
                     "boss_hp_end": boss_hp,
+                    "ball_count": ball_count,
                     "frames_rendered": frames_rendered,
                 }
                 write_result(result)
                 return result
 
-        boss_hp, hit_cooldown = handle_boss_collision(ball, boss_hp, damage, hit_cooldown)
+        if frame_index >= ITEM_START_FRAME and (frame_index - ITEM_START_FRAME) % ITEM_INTERVAL_FRAMES == 0:
+            if len(items) < MAX_ITEMS:
+                items.append(spawn_item(rng, balls, item_spawn_count))
+                item_spawn_count += 1
+
+        for ball in balls:
+            boss_hp, total_damage = handle_boss_collision(ball, boss_hp, total_damage)
+            limit_ball_speed(ball)
+
         if boss_hp <= 0:
             status = CLEAR
 
-        draw(render_surface, ball, boss_hp, boss_max_hp, status)
+        draw(render_surface, balls, items, effects, boss_hp, boss_max_hp, status)
         frame_path = FRAMES_DIR / f"frame_{frame_index:06d}.png"
         pygame.image.save(render_surface, str(frame_path))
         frames_rendered = frame_index
+
+        for effect in effects:
+            effect.frames_left -= 1
+        effects = [effect for effect in effects if effect.frames_left > 0]
+
+        gained_damage_up, gained_speed_up = handle_item_collisions(balls, items, effects)
+        damage_up_count += gained_damage_up
+        speed_up_count += gained_speed_up
 
         if preview_screen is not None:
             scaled_surface = pygame.transform.smoothscale(render_surface, preview_screen.get_size())
@@ -223,7 +386,7 @@ def run(frame_count: int, show_window: bool, boss_max_hp: int, damage: int) -> d
 
     if status is None:
         status = FAILED
-        draw(render_surface, ball, boss_hp, boss_max_hp, status)
+        draw(render_surface, balls, items, effects, boss_hp, boss_max_hp, status)
         frame_path = FRAMES_DIR / f"frame_{frames_rendered:06d}.png"
         pygame.image.save(render_surface, str(frame_path))
 
@@ -232,7 +395,13 @@ def run(frame_count: int, show_window: bool, boss_max_hp: int, damage: int) -> d
         "status": status,
         "boss_hp_start": boss_max_hp,
         "boss_hp_end": boss_hp,
-        "damage": damage,
+        "base_damage": damage,
+        "ball_count": ball_count,
+        "total_damage": total_damage,
+        "damage_up_collected": damage_up_count,
+        "speed_up_collected": speed_up_count,
+        "max_ball_damage": max(ball.damage for ball in balls),
+        "max_speed_level": max(ball.speed_level for ball in balls),
         "frames_rendered": frames_rendered,
     }
     write_result(result)
@@ -243,7 +412,14 @@ def run(frame_count: int, show_window: bool, boss_max_hp: int, damage: int) -> d
 def main() -> None:
     args = parse_args()
     show_window = args.window and not args.no_window
-    run(frame_count=args.frames, show_window=show_window, boss_max_hp=args.boss_hp, damage=args.damage)
+    run(
+        frame_count=args.frames,
+        show_window=show_window,
+        ball_count=args.balls,
+        boss_max_hp=args.boss_hp,
+        damage=args.damage,
+        seed=args.seed,
+    )
 
 
 if __name__ == "__main__":
