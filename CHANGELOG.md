@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## 0.8.0 - 2026-05-06
+
+### Added
+
+- Added sticky cheese projectiles for Pizza that attach to the enemy and deal periodic melt damage.
+- Added Burger Charge HP cost that spawns lettuce, cheese, tomato, and meat ally units.
+- Added synthesized audio cues for cheese shots, cheese ticks, ingredient spawns, and ingredient hits.
+
+### Changed
+
+- Replaced Pizza's old FIRE/BURN damage-over-time behavior with the sticky cheese attack.
+- Updated food duel documentation for the new Pizza and Burger skill mechanics.
+
 ## 0.7.0 - 2026-05-06
 
 ### Added

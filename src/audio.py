@@ -74,6 +74,20 @@ def add_event_sound(samples: list[float], kind: str, seconds: float) -> None:
         add_noise_hit(samples, seconds, 0.18, 0.08)
     elif kind == "fire_tick":
         add_tone(samples, seconds, 0.08, 620, 0.14)
+    elif kind == "cheese_shot":
+        add_tone(samples, seconds, 0.12, 540, 0.16)
+        add_tone(samples, seconds + 0.04, 0.12, 760, 0.12)
+    elif kind == "cheese_stick":
+        add_tone(samples, seconds, 0.16, 310, 0.18)
+        add_noise_hit(samples, seconds, 0.08, 0.08)
+    elif kind == "cheese_tick":
+        add_tone(samples, seconds, 0.07, 690, 0.13)
+    elif kind == "ingredient_spawn":
+        add_tone(samples, seconds, 0.14, 260, 0.16)
+        add_tone(samples, seconds + 0.06, 0.14, 420, 0.13)
+    elif kind == "ingredient_hit":
+        add_tone(samples, seconds, 0.1, 180, 0.18)
+        add_noise_hit(samples, seconds, 0.07, 0.12)
     elif kind == "charge_start":
         add_tone(samples, seconds, 0.22, 180, 0.18)
         add_tone(samples, seconds + 0.04, 0.22, 520, 0.16)

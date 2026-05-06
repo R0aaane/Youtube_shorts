@@ -29,6 +29,9 @@ def test_food_duel_config_uses_large_versus_balls() -> None:
     assert config.duel_ball_radius >= 70
     assert config.duration_seconds >= 20
     assert config.duel_speed_scale < 1.0
+    assert config.duel_burger_charge_hp_cost > 0
+    assert config.duel_ingredient_damage > 0
+    assert config.duel_cheese_damage > 0
     assert config.duel_left_food == "pizza"
     assert config.duel_right_food == "burger"
 

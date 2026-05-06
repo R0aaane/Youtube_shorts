@@ -63,6 +63,10 @@ class SimulationConfig:
     duel_ball_radius: int = 118
     duel_speed_scale: float = 1.0
     duel_charge_speed: int = 1220
+    duel_burger_charge_hp_cost: int = 40
+    duel_ingredient_damage: int = 10
+    duel_cheese_damage: int = 6
+    duel_cheese_projectile_speed: int = 760
     audio_enabled: bool = True
 
     @property
@@ -92,6 +96,10 @@ DEFAULT_CONFIG = {
     "duel_ball_radius": 118,
     "duel_speed_scale": 1.0,
     "duel_charge_speed": 1220,
+    "duel_burger_charge_hp_cost": 40,
+    "duel_ingredient_damage": 10,
+    "duel_cheese_damage": 6,
+    "duel_cheese_projectile_speed": 760,
     "audio_enabled": True,
 }
 
@@ -168,6 +176,33 @@ class DuelEffect:
 class AudioEvent:
     frame: int
     kind: str
+
+
+@dataclass
+class CheeseProjectile:
+    position: pygame.Vector2
+    velocity: pygame.Vector2
+    radius: int = 18
+    frames_left: int = 120
+
+
+@dataclass
+class CheesePatch:
+    attached_to: str
+    offset: pygame.Vector2
+    frames_left: int = 210
+    tick_frames: int = 30
+
+
+@dataclass
+class IngredientAlly:
+    kind: str
+    position: pygame.Vector2
+    velocity: pygame.Vector2
+    radius: int
+    damage: int
+    hit_cooldown: int = 0
+    frames_left: int = 720
 
 
 SPRITE_CACHE: dict[str, pygame.Surface] = {}
@@ -731,14 +766,18 @@ def food_label(food: str) -> str:
 
 def duel_skill_name(food: str) -> str:
     names = {
-        "pizza": "BURN",
-        "burger": "CHARGE",
+        "pizza": "CHEESE",
+        "burger": "CHARGE+ALLY",
         "sushi": "HEAL",
         "taco": "CRIT",
         "donut": "SHIELD",
         "fries": "COMBO",
     }
     return names.get(food, "HIT")
+
+
+def duel_ball_by_side(side: str, left: DuelBall, right: DuelBall) -> DuelBall:
+    return left if side == "left" else right
 
 
 def draw_scaled_food_skin(surface: pygame.Surface, skin: str, position: tuple[int, int], radius: int) -> None:
@@ -917,6 +956,70 @@ def draw_duel_effects(surface: pygame.Surface, effects: list[DuelEffect]) -> Non
             pygame.draw.circle(surface, (86, 220, 255), center, radius, width=7)
             if effect.label:
                 draw_text_with_shadow(surface, label_font, effect.label, (center[0], center[1] - radius - 22), effect.color)
+        elif effect.kind == "cheese":
+            radius = round(34 + progress * 65)
+            pygame.draw.circle(surface, (255, 220, 64), center, radius, width=8)
+            pygame.draw.circle(surface, (255, 250, 180), center, max(12, radius // 2), width=4)
+            if effect.label:
+                draw_text_with_shadow(surface, label_font, effect.label, (center[0], center[1] - radius - 20), effect.color)
+        elif effect.kind == "ingredient":
+            radius = round(28 + progress * 52)
+            pygame.draw.circle(surface, effect.color, center, radius, width=7)
+            if effect.label:
+                draw_text_with_shadow(surface, label_font, effect.label, (center[0], center[1] - radius - 18), effect.color)
+
+
+def draw_cheese_projectiles(surface: pygame.Surface, projectiles: list[CheeseProjectile]) -> None:
+    for projectile in projectiles:
+        center = (round(projectile.position.x), round(projectile.position.y))
+        pygame.draw.circle(surface, (148, 98, 18), (center[0] + 5, center[1] + 7), projectile.radius + 3)
+        pygame.draw.circle(surface, (255, 217, 61), center, projectile.radius)
+        pygame.draw.circle(surface, (255, 250, 186), (center[0] - 5, center[1] - 5), max(5, projectile.radius // 3))
+        pygame.draw.circle(surface, (177, 114, 20), center, projectile.radius, width=3)
+
+
+def draw_cheese_patches(surface: pygame.Surface, patches: list[CheesePatch], left: DuelBall, right: DuelBall) -> None:
+    for patch in patches:
+        target = duel_ball_by_side(patch.attached_to, left, right)
+        position = target.position + patch.offset.rotate(target.visual_angle)
+        center = (round(position.x), round(position.y))
+        pygame.draw.circle(surface, (255, 222, 68), center, 20)
+        pygame.draw.circle(surface, (255, 246, 164), (center[0] - 6, center[1] - 5), 7)
+        for angle in [30, 150, 270]:
+            end = pygame.Vector2(center) + pygame.Vector2(1, 0).rotate(angle + target.visual_angle) * 34
+            pygame.draw.line(surface, (255, 220, 68), center, end, 6)
+
+
+def ingredient_color(kind: str) -> tuple[int, int, int]:
+    colors = {
+        "lettuce": (116, 215, 70),
+        "cheese": (255, 211, 62),
+        "tomato": (229, 58, 48),
+        "meat": (105, 61, 38),
+    }
+    return colors.get(kind, (240, 240, 240))
+
+
+def draw_ingredient_allies(surface: pygame.Surface, allies: list[IngredientAlly]) -> None:
+    font = pygame.font.SysFont("arial", 18, bold=True)
+    labels = {"lettuce": "L", "cheese": "C", "tomato": "T", "meat": "M"}
+    for ally in allies:
+        center = (round(ally.position.x), round(ally.position.y))
+        color = ingredient_color(ally.kind)
+        pygame.draw.circle(surface, (8, 12, 18), (center[0] + 4, center[1] + 6), ally.radius + 3)
+        if ally.kind == "lettuce":
+            pygame.draw.ellipse(surface, color, pygame.Rect(center[0] - ally.radius, center[1] - ally.radius // 2, ally.radius * 2, ally.radius))
+        elif ally.kind == "cheese":
+            points = [(center[0], center[1] - ally.radius), (center[0] + ally.radius, center[1] + ally.radius), (center[0] - ally.radius, center[1] + ally.radius)]
+            pygame.draw.polygon(surface, color, points)
+        elif ally.kind == "tomato":
+            pygame.draw.circle(surface, color, center, ally.radius)
+            pygame.draw.circle(surface, (255, 125, 95), (center[0] - 5, center[1] - 5), max(4, ally.radius // 3))
+        else:
+            pygame.draw.circle(surface, color, center, ally.radius)
+            pygame.draw.circle(surface, (65, 36, 24), center, ally.radius, width=4)
+        pygame.draw.circle(surface, (245, 250, 255), center, ally.radius + 3, width=2)
+        draw_text(surface, font, labels.get(ally.kind, "?"), center, (10, 14, 20))
 
 
 def draw_duel_background(surface: pygame.Surface) -> pygame.Rect:
@@ -964,7 +1067,7 @@ def draw_duel_intro(surface: pygame.Surface, frame_index: int, intro_frames: int
         text = "FIGHT!"
         color = (105, 225, 255)
     draw_text_with_shadow(surface, intro_font, text, (WIDTH // 2, round(HEIGHT * 0.47)), color)
-    draw_text_with_shadow(surface, small_font, "PIZZA BURN  VS  BURGER CHARGE", (WIDTH // 2, round(HEIGHT * 0.55)), (255, 245, 230))
+    draw_text_with_shadow(surface, small_font, "PIZZA CHEESE  VS  BURGER ALLIES", (WIDTH // 2, round(HEIGHT * 0.55)), (255, 245, 230))
 
 
 def apply_duel_skill(
@@ -978,11 +1081,9 @@ def apply_duel_skill(
 ) -> int:
     damage = base_damage
     if attacker.skin == "pizza":
-        damage += 12
-        defender.burn_frames = 90
-        defender.burn_tick = 15
-        effects.append(DuelEffect("burn", defender.position.copy(), 36, (255, 172, 58), "BURN"))
-        audio_events.append(AudioEvent(frame_index, "burn"))
+        damage += 6
+        effects.append(DuelEffect("cheese", defender.position.copy(), 30, (255, 228, 82), "CHEESE HIT"))
+        audio_events.append(AudioEvent(frame_index, "cheese_stick"))
     elif attacker.skin == "burger" and attacker.charge_frames > 0:
         damage += 35
         effects.append(DuelEffect("charge", defender.position.copy(), 30, (105, 225, 255), "CHARGE HIT"))
@@ -1006,6 +1107,10 @@ def update_duel_ball(
     audio_events: list[AudioEvent],
     frame_index: int,
     charge_speed: int,
+    burger_hp_cost: int,
+    ingredient_damage: int,
+    allies: list[IngredientAlly],
+    effects: list[DuelEffect],
 ) -> None:
     if ball.skill_cooldown > 0:
         ball.skill_cooldown -= 1
@@ -1021,11 +1126,34 @@ def update_duel_ball(
     if ball.skin == "burger" and ball.skill_cooldown == 0:
         direction = target.position - ball.position
         if direction.length_squared() > 0:
+            paid_cost = min(max(0, ball.hp - 1), burger_hp_cost)
+            if paid_cost > 0:
+                ball.hp -= paid_cost
+                ingredient_kinds = ["lettuce", "cheese", "tomato", "meat"]
+                ally_count = max(1, paid_cost // 10)
+                for index in range(ally_count):
+                    angle = 180 + (index - (ally_count - 1) / 2) * 22
+                    spawn_offset = pygame.Vector2(1, 0).rotate(angle) * (ball.radius + 30)
+                    target_direction = target.position - (ball.position + spawn_offset)
+                    if target_direction.length_squared() == 0:
+                        target_direction = pygame.Vector2(-1, 0)
+                    velocity = target_direction.normalize().rotate(rng.uniform(-24, 24)) * 460
+                    allies.append(
+                        IngredientAlly(
+                            kind=ingredient_kinds[index % len(ingredient_kinds)],
+                            position=ball.position + spawn_offset,
+                            velocity=velocity,
+                            radius=18,
+                            damage=ingredient_damage,
+                        )
+                    )
+                effects.append(DuelEffect("ingredient", ball.position.copy(), 36, (126, 235, 95), f"ALLY x{ally_count}"))
+                audio_events.append(AudioEvent(frame_index, "ingredient_spawn"))
             ball.velocity = direction.normalize() * charge_speed
             ball.charge_frames = 36
             ball.skill_cooldown = 132
             audio_events.append(AudioEvent(frame_index, "charge_start"))
-    elif ball.skill_cooldown == 0:
+    elif ball.skill_cooldown == 0 and ball.skin != "pizza":
         ball.velocity.rotate_ip(rng.uniform(-22, 22))
         ball.skill_cooldown = 120
 
@@ -1062,6 +1190,127 @@ def apply_burn(ball: DuelBall, popups: list[DamagePopup], effects: list[DuelEffe
     effects.append(DuelEffect("burn", ball.position.copy(), 18, (255, 172, 58), "FIRE"))
     audio_events.append(AudioEvent(frame_index, "fire_tick"))
     return damage
+
+
+def fire_cheese_projectile(
+    attacker: DuelBall,
+    target: DuelBall,
+    projectiles: list[CheeseProjectile],
+    effects: list[DuelEffect],
+    audio_events: list[AudioEvent],
+    frame_index: int,
+    speed: int,
+) -> None:
+    direction = target.position - attacker.position
+    if direction.length_squared() == 0:
+        direction = pygame.Vector2(1, 0)
+    direction = direction.normalize()
+    start = attacker.position + direction * (attacker.radius + 24)
+    projectiles.append(CheeseProjectile(position=start, velocity=direction * speed))
+    attacker.skill_cooldown = 96
+    effects.append(DuelEffect("cheese", start.copy(), 24, (255, 228, 82), "CHEESE SHOT"))
+    audio_events.append(AudioEvent(frame_index, "cheese_shot"))
+
+
+def update_cheese_projectiles(
+    projectiles: list[CheeseProjectile],
+    patches: list[CheesePatch],
+    target_side: str,
+    target: DuelBall,
+    effects: list[DuelEffect],
+    audio_events: list[AudioEvent],
+    frame_index: int,
+) -> None:
+    remaining: list[CheeseProjectile] = []
+    for projectile in projectiles:
+        projectile.position += projectile.velocity / FPS
+        projectile.frames_left -= 1
+        if projectile.position.distance_to(target.position) <= target.radius + projectile.radius:
+            offset = projectile.position - target.position
+            if offset.length_squared() == 0:
+                offset = pygame.Vector2(0, -target.radius * 0.5)
+            offset = offset.rotate(-target.visual_angle)
+            patches.append(CheesePatch(attached_to=target_side, offset=offset))
+            effects.append(DuelEffect("cheese", projectile.position.copy(), 36, (255, 228, 82), "STICKY"))
+            audio_events.append(AudioEvent(frame_index, "cheese_stick"))
+            continue
+        if projectile.frames_left > 0:
+            remaining.append(projectile)
+    projectiles[:] = remaining
+
+
+def update_cheese_patches(
+    patches: list[CheesePatch],
+    left: DuelBall,
+    right: DuelBall,
+    damage: int,
+    popups: list[DamagePopup],
+    effects: list[DuelEffect],
+    audio_events: list[AudioEvent],
+    frame_index: int,
+) -> int:
+    total_damage = 0
+    remaining: list[CheesePatch] = []
+    for patch in patches:
+        target = duel_ball_by_side(patch.attached_to, left, right)
+        patch.frames_left -= 1
+        patch.tick_frames -= 1
+        if patch.tick_frames <= 0 and target.hp > 0:
+            patch.tick_frames = 30
+            dealt = min(target.hp, damage)
+            target.hp -= dealt
+            total_damage += dealt
+            position = target.position + patch.offset.rotate(target.visual_angle)
+            popups.append(DamagePopup(amount=dealt, position=position))
+            effects.append(DuelEffect("cheese", position, 18, (255, 228, 82), "MELT"))
+            audio_events.append(AudioEvent(frame_index, "cheese_tick"))
+        if patch.frames_left > 0 and target.hp > 0:
+            remaining.append(patch)
+    patches[:] = remaining
+    return total_damage
+
+
+def update_ingredient_allies(
+    allies: list[IngredientAlly],
+    target: DuelBall,
+    arena_rect: pygame.Rect,
+    popups: list[DamagePopup],
+    effects: list[DuelEffect],
+    audio_events: list[AudioEvent],
+    frame_index: int,
+) -> int:
+    total_damage = 0
+    remaining: list[IngredientAlly] = []
+    for ally in allies:
+        if ally.hit_cooldown > 0:
+            ally.hit_cooldown -= 1
+        ally.frames_left -= 1
+        direction = target.position - ally.position
+        if direction.length_squared() > 0:
+            desired = direction.normalize() * 420
+            ally.velocity = ally.velocity.lerp(desired, 0.035)
+        ally.position += ally.velocity / FPS
+
+        if ally.position.x - ally.radius < arena_rect.left or ally.position.x + ally.radius > arena_rect.right:
+            ally.velocity.x *= -1
+        if ally.position.y - ally.radius < arena_rect.top or ally.position.y + ally.radius > arena_rect.bottom:
+            ally.velocity.y *= -1
+        ally.position.x = max(arena_rect.left + ally.radius, min(arena_rect.right - ally.radius, ally.position.x))
+        ally.position.y = max(arena_rect.top + ally.radius, min(arena_rect.bottom - ally.radius, ally.position.y))
+
+        if ally.hit_cooldown == 0 and ally.position.distance_to(target.position) <= target.radius + ally.radius:
+            dealt = min(target.hp, ally.damage)
+            target.hp -= dealt
+            popups.append(DamagePopup(amount=dealt, position=target.position.copy()))
+            effects.append(DuelEffect("ingredient", ally.position.copy(), 24, ingredient_color(ally.kind), ally.kind.upper()))
+            audio_events.append(AudioEvent(frame_index, "ingredient_hit"))
+            ally.hit_cooldown = 42
+            total_damage += dealt
+
+        if ally.frames_left > 0 and target.hp > 0:
+            remaining.append(ally)
+    allies[:] = remaining
+    return total_damage
 
 
 def handle_duel_collision(
@@ -1144,6 +1393,10 @@ def run_food_duel(
     radius = config.duel_ball_radius
     speed_scale = max(0.2, config.duel_speed_scale)
     charge_speed = max(240, config.duel_charge_speed)
+    burger_hp_cost = max(0, config.duel_burger_charge_hp_cost)
+    ingredient_damage = max(1, config.duel_ingredient_damage)
+    cheese_damage = max(1, config.duel_cheese_damage)
+    cheese_projectile_speed = max(200, config.duel_cheese_projectile_speed)
     arena_rect = pygame.Rect(round(WIDTH * 0.09), round(HEIGHT * 0.21), round(WIDTH * 0.82), round(HEIGHT * 0.57))
     left_style = FOOD_BALL_STYLES.get(config.duel_left_food, FOOD_BALL_STYLES["pizza"])
     right_style = FOOD_BALL_STYLES.get(config.duel_right_food, FOOD_BALL_STYLES["burger"])
@@ -1169,6 +1422,9 @@ def run_food_duel(
     )
     popups: list[DamagePopup] = []
     duel_effects: list[DuelEffect] = []
+    cheese_projectiles: list[CheeseProjectile] = []
+    cheese_patches: list[CheesePatch] = []
+    ingredient_allies: list[IngredientAlly] = []
     audio_events: list[AudioEvent] = [AudioEvent(1, "ready"), AudioEvent(46, "fight")]
     intro_frames = 90
     result_frame_count = min(fps * 3, max(1, frame_count // 2))
@@ -1196,12 +1452,68 @@ def run_food_duel(
                 result_started_frame = frame_index
             if winner is None and frame_index > intro_frames:
                 if hit_stop_frames <= 0:
-                    update_duel_ball(left, right, arena_rect, rng, audio_events, frame_index, charge_speed)
-                    update_duel_ball(right, left, arena_rect, rng, audio_events, frame_index, charge_speed)
+                    update_duel_ball(
+                        left,
+                        right,
+                        arena_rect,
+                        rng,
+                        audio_events,
+                        frame_index,
+                        charge_speed,
+                        burger_hp_cost,
+                        ingredient_damage,
+                        ingredient_allies,
+                        duel_effects,
+                    )
+                    update_duel_ball(
+                        right,
+                        left,
+                        arena_rect,
+                        rng,
+                        audio_events,
+                        frame_index,
+                        charge_speed,
+                        burger_hp_cost,
+                        ingredient_damage,
+                        ingredient_allies,
+                        duel_effects,
+                    )
+                    if left.skin == "pizza" and left.skill_cooldown == 0:
+                        fire_cheese_projectile(
+                            left,
+                            right,
+                            cheese_projectiles,
+                            duel_effects,
+                            audio_events,
+                            frame_index,
+                            cheese_projectile_speed,
+                        )
+                    update_cheese_projectiles(cheese_projectiles, cheese_patches, "right", right, duel_effects, audio_events, frame_index)
+                    cheese_damage_done = update_cheese_patches(
+                        cheese_patches,
+                        left,
+                        right,
+                        cheese_damage,
+                        popups,
+                        duel_effects,
+                        audio_events,
+                        frame_index,
+                    )
+                    if cheese_damage_done > 0:
+                        left.total_damage_dealt += cheese_damage_done
+                    ally_damage = update_ingredient_allies(
+                        ingredient_allies,
+                        left,
+                        arena_rect,
+                        popups,
+                        duel_effects,
+                        audio_events,
+                        frame_index,
+                    )
                     hit_landed = handle_duel_collision(left, right, damage, popups, duel_effects, audio_events, frame_index, rng)
-                    apply_burn(left, popups, duel_effects, audio_events, frame_index)
-                    apply_burn(right, popups, duel_effects, audio_events, frame_index)
-                    if hit_landed:
+                    if ally_damage > 0:
+                        right.total_damage_dealt += ally_damage
+                    if hit_landed or ally_damage > 0 or cheese_damage_done > 0:
                         hit_stop_frames = 7
                         shake_frames = 16
                         shake_strength = 22
@@ -1216,6 +1528,9 @@ def run_food_duel(
             popup_font = pygame.font.SysFont("arial", 62, bold=True)
             if winner is None:
                 draw_duel_effects(render_surface, duel_effects)
+                draw_cheese_patches(render_surface, cheese_patches, left, right)
+                draw_cheese_projectiles(render_surface, cheese_projectiles)
+                draw_ingredient_allies(render_surface, ingredient_allies)
                 draw_duel_ball(render_surface, left, ball_font)
                 draw_duel_ball(render_surface, right, ball_font)
                 draw_duel_intro(render_surface, frame_index, intro_frames)
@@ -1292,6 +1607,12 @@ def run_food_duel(
         "ball_radius": radius,
         "speed_scale": speed_scale,
         "charge_speed": charge_speed,
+        "burger_charge_hp_cost": burger_hp_cost,
+        "ingredient_damage": ingredient_damage,
+        "cheese_damage": cheese_damage,
+        "cheese_projectile_speed": cheese_projectile_speed,
+        "ingredient_ally_count": len(ingredient_allies),
+        "cheese_patch_count": len(cheese_patches),
         "frames_rendered": frames_rendered,
         "result_started_frame": result_started_frame,
         "fps": fps,
