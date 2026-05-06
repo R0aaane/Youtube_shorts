@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 0.14.1 - 2026-05-07
+
+### Changed
+
+- Enlarged and lowered the food duel arena to reduce empty space below the board.
+- Tightened the top food duel HUD spacing so the vertical Shorts layout feels more balanced.
+- Shortened the brown board background panel so it no longer stretches deep into unused lower space.
+
 ## 0.14.0 - 2026-05-07
 
 ### Changed

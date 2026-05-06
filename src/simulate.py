@@ -814,8 +814,8 @@ def duel_attack_color(skin: str) -> tuple[int, int, int]:
 
 
 def duel_arena_rect() -> pygame.Rect:
-    size = round(min(WIDTH * 0.84, HEIGHT * 0.46))
-    return pygame.Rect((WIDTH - size) // 2, round(HEIGHT * 0.17), size, size)
+    size = round(min(WIDTH * 0.88, HEIGHT * 0.50))
+    return pygame.Rect((WIDTH - size) // 2, round(HEIGHT * 0.215), size, size)
 
 
 def draw_scaled_food_skin(surface: pygame.Surface, skin: str, position: tuple[int, int], radius: int) -> None:
@@ -1139,7 +1139,7 @@ def draw_duel_background(surface: pygame.Surface) -> pygame.Rect:
     cached.fill((24, 16, 12))
     vs_font = make_font(88, bold=True, italic=True)
 
-    board_rect = pygame.Rect(round(WIDTH * 0.035), round(HEIGHT * 0.02), round(WIDTH * 0.93), round(HEIGHT * 0.90))
+    board_rect = pygame.Rect(round(WIDTH * 0.035), round(HEIGHT * 0.035), round(WIDTH * 0.93), round(HEIGHT * 0.86))
     pygame.draw.rect(cached, (43, 27, 18), board_rect, border_radius=28)
     pygame.draw.rect(cached, (66, 42, 27), board_rect.inflate(-18, -18), border_radius=22)
     for x in range(board_rect.left + 38, board_rect.right, 86):
@@ -1157,18 +1157,18 @@ def draw_duel_background(surface: pygame.Surface) -> pygame.Rect:
         pygame.draw.line(cached, grid_color, (x, arena_rect.top), (x, arena_rect.bottom), 1)
     for y in range(arena_rect.top + 80, arena_rect.bottom, 120):
         pygame.draw.line(cached, grid_color, (arena_rect.left, y), (arena_rect.right, y), 1)
-    draw_text_with_shadow(cached, vs_font, "VS", (WIDTH // 2, round(HEIGHT * 0.145)), (238, 229, 206), (34, 20, 14))
+    draw_text_with_shadow(cached, vs_font, "VS", (WIDTH // 2, round(HEIGHT * 0.138)), (238, 229, 206), (34, 20, 14))
     DUEL_BACKGROUND_CACHE = cached
     surface.blit(DUEL_BACKGROUND_CACHE, (0, 0))
     return arena_rect
 
 
 def draw_duel_hud(surface: pygame.Surface, left: DuelBall, right: DuelBall, frame_index: int, total_frames: int) -> None:
-    hud_font = make_font(42, bold=True)
-    small_font = make_font(27, bold=True)
-    panel_y = round(HEIGHT * 0.055)
+    hud_font = make_font(39, bold=True)
+    small_font = make_font(25, bold=True)
+    panel_y = round(HEIGHT * 0.047)
     panel_width = round(WIDTH * 0.42)
-    panel_height = 122
+    panel_height = 112
     left_panel = pygame.Rect(round(WIDTH * 0.045), panel_y, panel_width, panel_height)
     right_panel = pygame.Rect(WIDTH - round(WIDTH * 0.045) - panel_width, panel_y, panel_width, panel_height)
 
@@ -1177,7 +1177,7 @@ def draw_duel_hud(surface: pygame.Surface, left: DuelBall, right: DuelBall, fram
         pygame.draw.rect(surface, (31, 22, 18), rect, border_radius=10)
         pygame.draw.rect(surface, color, rect, width=4, border_radius=10)
         label_x = rect.right - 24 if align_right else rect.left + 24
-        label_center = (label_x, rect.top + 32)
+        label_center = (label_x, rect.top + 30)
         label_text = f"{ball.name} {max(0, ball.hp)} HP"
         text_surface = hud_font.render(label_text, True, (255, 245, 230))
         text_rect = text_surface.get_rect(midright=label_center) if align_right else text_surface.get_rect(midleft=label_center)
@@ -1185,7 +1185,7 @@ def draw_duel_hud(surface: pygame.Surface, left: DuelBall, right: DuelBall, fram
         surface.blit(hud_font.render(label_text, True, (0, 0, 0)), shadow_rect)
         surface.blit(text_surface, text_rect)
 
-        bar_rect = pygame.Rect(rect.left + 22, rect.top + 66, rect.width - 44, 34)
+        bar_rect = pygame.Rect(rect.left + 22, rect.top + 61, rect.width - 44, 31)
         ratio = max(0.0, min(1.0, ball.hp / max(1, ball.max_hp)))
         pygame.draw.rect(surface, (61, 54, 48), bar_rect, border_radius=7)
         fill_rect = bar_rect.copy()
@@ -1203,11 +1203,11 @@ def draw_duel_hud(surface: pygame.Surface, left: DuelBall, right: DuelBall, fram
     right_cd = max(0, right.skill_cooldown // 60)
     draw_panel(left_panel, left, duel_attack_color(left.skin))
     draw_panel(right_panel, right, duel_attack_color(right.skin), align_right=True)
-    draw_text_with_shadow(surface, small_font, f"{duel_skill_name(left.skin)} {left_cd}", (left_panel.centerx, left_panel.bottom + 24), (235, 226, 205))
-    draw_text_with_shadow(surface, small_font, f"{duel_skill_name(right.skin)} {right_cd}", (right_panel.centerx, right_panel.bottom + 24), (235, 226, 205))
+    draw_text_with_shadow(surface, small_font, f"{duel_skill_name(left.skin)} {left_cd}", (left_panel.centerx, left_panel.bottom + 18), (235, 226, 205))
+    draw_text_with_shadow(surface, small_font, f"{duel_skill_name(right.skin)} {right_cd}", (right_panel.centerx, right_panel.bottom + 18), (235, 226, 205))
 
     progress = min(1.0, frame_index / max(1, total_frames))
-    progress_rect = pygame.Rect(68, HEIGHT - 54, WIDTH - 136, 8)
+    progress_rect = pygame.Rect(68, HEIGHT - 126, WIDTH - 136, 8)
     pygame.draw.rect(surface, (58, 48, 41), progress_rect)
     pygame.draw.rect(surface, (235, 226, 205), pygame.Rect(progress_rect.left, progress_rect.top, round(progress_rect.width * progress), progress_rect.height))
 
