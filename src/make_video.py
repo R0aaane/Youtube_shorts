@@ -12,6 +12,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "configs" / "boss_battle_001.json"
 FRAMES_DIR = PROJECT_ROOT / "output" / "frames"
 VIDEOS_DIR = PROJECT_ROOT / "output" / "videos"
+METADATA_DIR = PROJECT_ROOT / "output" / "metadata"
+RESULT_PATH = METADATA_DIR / "simulation_result.json"
 INPUT_PATTERN = FRAMES_DIR / "frame_%06d.png"
 DEFAULT_OUTPUT_NAME = "simulation_001"
 DEFAULT_FPS = 60
@@ -43,19 +45,28 @@ def ensure_frames_exist() -> None:
         )
 
 
-def load_video_config(path: Path | None) -> dict:
+def resolve_config_path(path: Path | None) -> Path | None:
+    if path is not None:
+        return path if path.is_absolute() else PROJECT_ROOT / path
+    if DEFAULT_CONFIG_PATH.exists():
+        return DEFAULT_CONFIG_PATH
+    return None
+
+
+def load_video_config(path: Path | None) -> tuple[dict, Path | None]:
     config = {
         "fps": DEFAULT_FPS,
         "video_width": DEFAULT_WIDTH,
         "video_height": DEFAULT_HEIGHT,
         "output_name": DEFAULT_OUTPUT_NAME,
+        "duration_seconds": 10,
+        "boss_hp": 10000,
+        "initial_ball_count": 10,
     }
-    if path is not None:
-        config_path = path if path.is_absolute() else PROJECT_ROOT / path
+    config_path = resolve_config_path(path)
+    if config_path is not None:
         config.update(json.loads(config_path.read_text(encoding="utf-8")))
-    elif DEFAULT_CONFIG_PATH.exists():
-        config.update(json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8")))
-    return config
+    return config, config_path
 
 
 def parse_args() -> argparse.Namespace:
@@ -92,16 +103,75 @@ def make_video(config: dict) -> Path:
     return output_video
 
 
+def relative_path(path: Path) -> str:
+    return str(path.resolve().relative_to(PROJECT_ROOT)).replace("\\", "/")
+
+
+def load_result() -> dict:
+    if not RESULT_PATH.exists():
+        return {}
+    return json.loads(RESULT_PATH.read_text(encoding="utf-8"))
+
+
+def build_title(config: dict, result: dict) -> str:
+    ball_count = config["initial_ball_count"]
+    boss_hp = config["boss_hp"]
+    status = result.get("status")
+    if status == "CLEAR":
+        clear_time = result.get("clear_time_seconds")
+        if clear_time is not None:
+            return f"Can {ball_count} Balls Destroy a {boss_hp:,} HP Boss in {clear_time:.2f}s?"
+    return f"Can {ball_count} Balls Destroy a {boss_hp:,} HP Boss?"
+
+
+def write_youtube_metadata(config: dict, config_path: Path | None, video_path: Path) -> Path:
+    result = load_result()
+    status = result.get("status", "UNKNOWN")
+    total_damage = result.get("total_damage", 0)
+    boss_hp_end = result.get("boss_hp_end", config["boss_hp"])
+
+    metadata = {
+        "title": build_title(config, result),
+        "description": (
+            f"{config['initial_ball_count']} evolving physics balls battle a "
+            f"{config['boss_hp']:,} HP boss. Result: {status}. "
+            f"Total damage: {total_damage}. Remaining HP: {boss_hp_end}. #shorts"
+        ),
+        "tags": [
+            "shorts",
+            "physics simulation",
+            "2d physics",
+            "pymunk",
+            "pygame",
+            "boss battle",
+            "evolving balls",
+        ],
+        "video_file": relative_path(video_path),
+        "config_file": relative_path(config_path) if config_path is not None else None,
+        "result": result,
+        "duration_seconds": config["duration_seconds"],
+        "boss_hp": config["boss_hp"],
+        "initial_ball_count": config["initial_ball_count"],
+    }
+
+    METADATA_DIR.mkdir(parents=True, exist_ok=True)
+    metadata_path = METADATA_DIR / f"{config['output_name']}.json"
+    metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    return metadata_path
+
+
 def main() -> int:
     args = parse_args()
-    config = load_video_config(args.config)
+    config, config_path = load_video_config(args.config)
     try:
         output_path = make_video(config)
     except (FileNotFoundError, RuntimeError, subprocess.CalledProcessError) as exc:
         print(f"Video generation failed: {exc}", file=sys.stderr)
         return 1
 
+    metadata_path = write_youtube_metadata(config, config_path, output_path)
     print(f"Video saved: {output_path}")
+    print(f"Metadata saved: {metadata_path}")
     return 0
 
 

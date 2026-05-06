@@ -95,6 +95,34 @@ output/videos/<output_name>.mp4
 
 The MP4 uses the configured FPS and resolution, H.264, `yuv420p`, and faststart.
 
+## YouTube Metadata
+
+`make_video.py` also writes a matching YouTube metadata JSON file.
+
+```text
+output/metadata/<output_name>.json
+```
+
+For the default config, the file is:
+
+```text
+output/metadata/simulation_001.json
+```
+
+The metadata includes:
+
+- `title`
+- `description`
+- `tags`
+- `video_file`
+- `config_file`
+- `result`
+- `duration_seconds`
+- `boss_hp`
+- `initial_ball_count`
+
+The title is generated in English for Shorts, the description includes `#shorts`, and `tags` is a JSON array. This metadata is only saved locally; YouTube upload is not implemented.
+
 ## Current Scope
 
 - Physics: pymunk
