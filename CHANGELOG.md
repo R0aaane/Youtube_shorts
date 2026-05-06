@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 0.16.0 - 2026-05-07
+
+### Added
+
+- Added generated Burger sprite variants for missing lettuce, cheese, tomato, and patty states.
+
+### Changed
+
+- Changed Burger ingredient loss from dynamic drawn marks to generated burger image swaps when ingredients are summoned.
+- Updated food duel documentation for generated Burger state sprites.
+
 ## 0.15.2 - 2026-05-07
 
 ### Changed

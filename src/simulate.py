@@ -937,16 +937,28 @@ def load_kitchen_background() -> pygame.Surface | None:
     return BACKGROUND_CACHE
 
 
-def load_food_sprite(skin: str, radius: int) -> pygame.Surface | None:
-    cache_key = f"{skin}:{radius}"
+def load_food_sprite(skin: str, radius: int, missing_stage: int = 0) -> pygame.Surface | None:
+    missing_stage = min(4, max(0, missing_stage if skin == "burger" else 0))
+    cache_key = f"{skin}:{radius}:{missing_stage}"
     if cache_key in SPRITE_CACHE:
         return SPRITE_CACHE[cache_key]
 
-    sprite_paths = {
-        "pizza": FOOD_SPRITES_DIR / "pizza_alpha.png",
-        "burger": FOOD_SPRITES_DIR / "burger_alpha.png",
+    burger_variants = {
+        1: FOOD_SPRITES_DIR / "burger_missing_lettuce_alpha.png",
+        2: FOOD_SPRITES_DIR / "burger_missing_lettuce_cheese_alpha.png",
+        3: FOOD_SPRITES_DIR / "burger_missing_lettuce_cheese_tomato_alpha.png",
+        4: FOOD_SPRITES_DIR / "burger_missing_lettuce_cheese_tomato_meat_alpha.png",
     }
-    sprite_path = sprite_paths.get(skin)
+    if skin == "burger" and missing_stage > 0:
+        sprite_path = burger_variants.get(missing_stage)
+        if sprite_path is not None and not sprite_path.exists():
+            sprite_path = FOOD_SPRITES_DIR / "burger_alpha.png"
+    else:
+        sprite_paths = {
+            "pizza": FOOD_SPRITES_DIR / "pizza_alpha.png",
+            "burger": FOOD_SPRITES_DIR / "burger_alpha.png",
+        }
+        sprite_path = sprite_paths.get(skin)
     if sprite_path is None or not sprite_path.exists():
         return None
 
@@ -982,7 +994,8 @@ def load_ingredient_sprite(kind: str, radius: int) -> pygame.Surface | None:
 
 
 def draw_food_sprite(surface: pygame.Surface, ball: DuelBall, position: tuple[int, int]) -> bool:
-    sprite = load_food_sprite(ball.skin, ball.radius)
+    missing_stage = len(ball.missing_ingredients) if ball.skin == "burger" else 0
+    sprite = load_food_sprite(ball.skin, ball.radius, missing_stage)
     if sprite is None:
         return False
 
@@ -991,8 +1004,6 @@ def draw_food_sprite(surface: pygame.Surface, ball: DuelBall, position: tuple[in
     pygame.draw.circle(glow, glow_color, position, round(ball.radius * 1.35))
     pygame.draw.circle(glow, (*duel_attack_color(ball.skin), 88), position, round(ball.radius * 1.02), width=5)
     surface.blit(glow, (0, 0))
-    if ball.skin == "burger" and ball.missing_ingredients:
-        sprite = burger_sprite_with_missing_ingredients(sprite, ball.missing_ingredients)
     rotated = pygame.transform.rotozoom(sprite, -ball.visual_angle, 1.0)
     rect = rotated.get_rect(center=position)
     shadow = rotated.copy()
@@ -1000,35 +1011,6 @@ def draw_food_sprite(surface: pygame.Surface, ball: DuelBall, position: tuple[in
     surface.blit(shadow, rect.move(10, 14))
     surface.blit(rotated, rect)
     return True
-
-
-def burger_sprite_with_missing_ingredients(sprite: pygame.Surface, missing_ingredients: list[str]) -> pygame.Surface:
-    cache_key = f"burger_missing:{id(sprite)}:{'-'.join(missing_ingredients[-4:])}"
-    if cache_key in SPRITE_CACHE:
-        return SPRITE_CACHE[cache_key]
-
-    edited = sprite.copy()
-    width, height = edited.get_size()
-    layer_map = {
-        "lettuce": (0.48, 0.24, 0.08, (106, 174, 67, 210), (211, 245, 134, 170)),
-        "cheese": (0.56, 0.23, 0.075, (240, 177, 42, 210), (255, 231, 102, 180)),
-        "tomato": (0.61, 0.22, 0.075, (194, 64, 44, 205), (255, 128, 76, 160)),
-        "meat": (0.67, 0.25, 0.09, (122, 74, 46, 210), (214, 139, 74, 155)),
-    }
-    for index, kind in enumerate(missing_ingredients[-4:]):
-        y_ratio, width_ratio, height_ratio, fill, highlight = layer_map.get(kind, (0.55, 0.22, 0.08, (170, 112, 60, 205), (242, 190, 104, 150)))
-        cut_width = round(width * max(0.18, width_ratio - index * 0.025))
-        cut_height = round(height * height_ratio)
-        cut = pygame.Rect(0, 0, cut_width, cut_height)
-        cut.center = (round(width * (0.66 - (index % 2) * 0.07)), round(height * y_ratio))
-        pygame.draw.ellipse(edited, fill, cut)
-        pygame.draw.ellipse(edited, highlight, cut.inflate(-round(width * 0.05), -round(height * 0.025)), width=max(2, round(height * 0.01)))
-        inner = cut.inflate(-round(width * 0.08), -round(height * 0.035))
-        if inner.width > 0 and inner.height > 0:
-            pygame.draw.arc(edited, highlight, inner, math.radians(180), math.radians(350), max(2, round(height * 0.011)))
-
-    SPRITE_CACHE[cache_key] = edited
-    return edited
 
 
 def draw_duel_ball(surface: pygame.Surface, ball: DuelBall, font: pygame.font.Font) -> None:
