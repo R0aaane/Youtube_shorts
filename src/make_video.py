@@ -17,7 +17,6 @@ VIDEOS_DIR = PROJECT_ROOT / "output" / "videos"
 METADATA_DIR = PROJECT_ROOT / "output" / "metadata"
 PROJECT_AUDIO_DIR = PROJECT_ROOT / "output" / "audio"
 RESULT_PATH = METADATA_DIR / "simulation_result.json"
-INPUT_PATTERN = FRAMES_DIR / "frame_%06d.png"
 DEFAULT_OUTPUT_NAME = "simulation_001"
 DEFAULT_FPS = 60
 DEFAULT_WIDTH = 1080
@@ -40,12 +39,17 @@ def ensure_ffmpeg() -> str:
 
 
 def ensure_frames_exist() -> None:
-    first_frame = FRAMES_DIR / "frame_000001.png"
-    if not first_frame.exists():
+    if not (FRAMES_DIR / "frame_000001.png").exists() and not (FRAMES_DIR / "frame_000001.jpg").exists():
         raise FileNotFoundError(
-            f"Input frames were not found: {first_frame}\n"
+            f"Input frames were not found under: {FRAMES_DIR}\n"
             "Generate frames first with: python src/simulate.py --frames 600 --no-window"
         )
+
+
+def input_pattern() -> Path:
+    if (FRAMES_DIR / "frame_000001.jpg").exists():
+        return FRAMES_DIR / "frame_%06d.jpg"
+    return FRAMES_DIR / "frame_%06d.png"
 
 
 def resolve_config_path(path: Path | None) -> Path | None:
@@ -108,7 +112,7 @@ def make_video(config: dict) -> Path:
         "-framerate",
         str(config["fps"]),
         "-i",
-        str(INPUT_PATTERN),
+        str(input_pattern()),
     ]
     if audio_path is not None:
         command.extend(["-i", str(audio_path)])

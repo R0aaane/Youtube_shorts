@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## 0.9.0 - 2026-05-06
+
+### Added
+
+- Added a generated kitchen battle background for the food duel.
+- Added realistic generated ingredient sprites for lettuce, cheese, tomato, and burger patty allies.
+
+### Changed
+
+- Changed Burger Charge to launch one larger ingredient ally per charge.
+- Updated food duel typography to use a more modern system font preference.
+- Changed food duel frame export to JPEG so photo backgrounds render in a practical amount of time.
+- Updated food duel documentation for the kitchen background and revised ingredient ally behavior.
+
 ## 0.8.0 - 2026-05-06
 
 ### Added

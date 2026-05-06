@@ -39,3 +39,10 @@ def test_food_duel_config_uses_large_versus_balls() -> None:
 def test_food_duel_realistic_sprites_exist() -> None:
     assert Path("assets/food_sprites/pizza_magenta.png").exists()
     assert Path("assets/food_sprites/burger_magenta.png").exists()
+    assert Path("assets/food_sprites/pizza_alpha.png").exists()
+    assert Path("assets/food_sprites/burger_alpha.png").exists()
+    assert Path("assets/food_sprites/kitchen_battle_bg.png").exists()
+    assert Path("assets/food_sprites/kitchen_battle_bg_optimized.png").exists()
+    for ingredient in ["lettuce", "cheese", "tomato", "meat"]:
+        assert Path(f"assets/food_sprites/ingredient_{ingredient}_magenta.png").exists()
+        assert Path(f"assets/food_sprites/ingredient_{ingredient}_alpha.png").exists()

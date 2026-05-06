@@ -16,6 +16,7 @@ FRAMES_DIR = PROJECT_ROOT / "output" / "frames"
 METADATA_DIR = PROJECT_ROOT / "output" / "metadata"
 RESULT_PATH = METADATA_DIR / "simulation_result.json"
 FOOD_SPRITES_DIR = PROJECT_ROOT / "assets" / "food_sprites"
+KITCHEN_BACKGROUND_PATH = FOOD_SPRITES_DIR / "kitchen_battle_bg_optimized.png"
 
 WIDTH = 1080
 HEIGHT = 1920
@@ -203,15 +204,30 @@ class IngredientAlly:
     damage: int
     hit_cooldown: int = 0
     frames_left: int = 720
+    visual_angle: float = 0.0
 
 
 SPRITE_CACHE: dict[str, pygame.Surface] = {}
+BACKGROUND_CACHE: pygame.Surface | None = None
+DUEL_BACKGROUND_CACHE: pygame.Surface | None = None
+
+
+STYLE_FONT_NAMES = (
+    "bahnschrift",
+    "segoeuiblack",
+    "segoeui",
+    "centurygothic",
+    "trebuchetms",
+    "verdana",
+)
 
 
 def update_layout(width: int, height: int) -> None:
-    global WIDTH, HEIGHT, BOSS_RECT, HP_BAR_RECT
+    global WIDTH, HEIGHT, BOSS_RECT, HP_BAR_RECT, BACKGROUND_CACHE, DUEL_BACKGROUND_CACHE
     WIDTH = width
     HEIGHT = height
+    BACKGROUND_CACHE = None
+    DUEL_BACKGROUND_CACHE = None
     boss_width = round(width * 0.52)
     boss_height = round(height * 0.094)
     BOSS_RECT = pygame.Rect((width - boss_width) // 2, round(height * 0.125), boss_width, boss_height)
@@ -382,6 +398,8 @@ def clear_frames_dir() -> None:
     FRAMES_DIR.mkdir(parents=True, exist_ok=True)
     for frame_path in FRAMES_DIR.glob("*.png"):
         frame_path.unlink(missing_ok=True)
+    for frame_path in FRAMES_DIR.glob("*.jpg"):
+        frame_path.unlink(missing_ok=True)
 
 
 def create_background() -> pygame.Surface:
@@ -525,6 +543,14 @@ def draw_text(surface: pygame.Surface, font: pygame.font.Font, text: str, center
     text_surface = font.render(text, True, color)
     text_rect = text_surface.get_rect(center=center)
     surface.blit(text_surface, text_rect)
+
+
+def make_font(size: int, bold: bool = True, italic: bool = False) -> pygame.font.Font:
+    for name in STYLE_FONT_NAMES:
+        font_path = pygame.font.match_font(name, bold=bold, italic=italic)
+        if font_path:
+            return pygame.font.Font(font_path, size)
+    return pygame.font.SysFont("arial", size, bold=bold, italic=italic)
 
 
 def draw_text_with_shadow(
@@ -841,15 +867,34 @@ def draw_scaled_food_skin(surface: pygame.Surface, skin: str, position: tuple[in
 
 
 def chroma_key_magenta(surface: pygame.Surface) -> pygame.Surface:
-    keyed = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
-    keyed.blit(surface, (0, 0))
-    width, height = keyed.get_size()
-    for y in range(height):
-        for x in range(width):
-            color = keyed.get_at((x, y))
-            if color.r > 175 and color.b > 175 and color.g < 120:
-                keyed.set_at((x, y), (color.r, color.g, color.b, 0))
+    keyed = surface.copy()
+    key_color = surface.get_at((0, 0))
+    keyed.set_colorkey((key_color.r, key_color.g, key_color.b), pygame.RLEACCEL)
     return keyed
+
+
+def scale_cover(source: pygame.Surface, target_size: tuple[int, int]) -> pygame.Surface:
+    target_width, target_height = target_size
+    source_width, source_height = source.get_size()
+    scale = max(target_width / source_width, target_height / source_height)
+    scaled_size = (round(source_width * scale), round(source_height * scale))
+    scaled = pygame.transform.smoothscale(source, scaled_size)
+    crop_rect = pygame.Rect(0, 0, target_width, target_height)
+    crop_rect.center = scaled.get_rect().center
+    result = pygame.Surface(target_size, pygame.SRCALPHA)
+    result.blit(scaled, (0, 0), crop_rect)
+    return result
+
+
+def load_kitchen_background() -> pygame.Surface | None:
+    global BACKGROUND_CACHE
+    if BACKGROUND_CACHE is not None:
+        return BACKGROUND_CACHE
+    if not KITCHEN_BACKGROUND_PATH.exists():
+        return None
+    source = pygame.image.load(str(KITCHEN_BACKGROUND_PATH))
+    BACKGROUND_CACHE = scale_cover(source, (WIDTH, HEIGHT))
+    return BACKGROUND_CACHE
 
 
 def load_food_sprite(skin: str, radius: int) -> pygame.Surface | None:
@@ -858,16 +903,31 @@ def load_food_sprite(skin: str, radius: int) -> pygame.Surface | None:
         return SPRITE_CACHE[cache_key]
 
     sprite_paths = {
-        "pizza": FOOD_SPRITES_DIR / "pizza_magenta.png",
-        "burger": FOOD_SPRITES_DIR / "burger_magenta.png",
+        "pizza": FOOD_SPRITES_DIR / "pizza_alpha.png",
+        "burger": FOOD_SPRITES_DIR / "burger_alpha.png",
     }
     sprite_path = sprite_paths.get(skin)
     if sprite_path is None or not sprite_path.exists():
         return None
 
-    source = pygame.image.load(str(sprite_path))
-    keyed = chroma_key_magenta(source)
+    keyed = pygame.image.load(str(sprite_path))
     sprite_size = round(radius * (2.95 if skin == "pizza" else 2.7))
+    scaled = pygame.transform.smoothscale(keyed, (sprite_size, sprite_size))
+    SPRITE_CACHE[cache_key] = scaled
+    return scaled
+
+
+def load_ingredient_sprite(kind: str, radius: int) -> pygame.Surface | None:
+    cache_key = f"ingredient:{kind}:{radius}"
+    if cache_key in SPRITE_CACHE:
+        return SPRITE_CACHE[cache_key]
+
+    sprite_path = FOOD_SPRITES_DIR / f"ingredient_{kind}_alpha.png"
+    if not sprite_path.exists():
+        return None
+
+    keyed = pygame.image.load(str(sprite_path))
+    sprite_size = round(radius * 2.45)
     scaled = pygame.transform.smoothscale(keyed, (sprite_size, sprite_size))
     SPRITE_CACHE[cache_key] = scaled
     return scaled
@@ -924,15 +984,15 @@ def draw_duel_ball(surface: pygame.Surface, ball: DuelBall, font: pygame.font.Fo
         draw_scaled_food_skin(surface, ball.skin, position, ball.radius)
     draw_text_with_shadow(surface, font, str(max(0, ball.hp)), position, (255, 255, 255))
     if ball.charge_frames > 0:
-        label_font = pygame.font.SysFont("arial", 34, bold=True)
+        label_font = make_font(34, bold=True, italic=True)
         draw_text_with_shadow(surface, label_font, "CHARGE", (position[0], position[1] - ball.radius - 44), (105, 225, 255))
     elif ball.burn_frames > 0:
-        label_font = pygame.font.SysFont("arial", 34, bold=True)
+        label_font = make_font(34, bold=True, italic=True)
         draw_text_with_shadow(surface, label_font, "BURN", (position[0], position[1] - ball.radius - 44), (255, 172, 58))
 
 
 def draw_duel_effects(surface: pygame.Surface, effects: list[DuelEffect]) -> None:
-    label_font = pygame.font.SysFont("arial", 42, bold=True)
+    label_font = make_font(42, bold=True, italic=True)
     for effect in effects:
         progress = 1 - effect.frames_left / max(1, 36)
         center = (round(effect.position.x), round(effect.position.y))
@@ -1001,47 +1061,58 @@ def ingredient_color(kind: str) -> tuple[int, int, int]:
 
 
 def draw_ingredient_allies(surface: pygame.Surface, allies: list[IngredientAlly]) -> None:
-    font = pygame.font.SysFont("arial", 18, bold=True)
-    labels = {"lettuce": "L", "cheese": "C", "tomato": "T", "meat": "M"}
     for ally in allies:
         center = (round(ally.position.x), round(ally.position.y))
         color = ingredient_color(ally.kind)
-        pygame.draw.circle(surface, (8, 12, 18), (center[0] + 4, center[1] + 6), ally.radius + 3)
-        if ally.kind == "lettuce":
-            pygame.draw.ellipse(surface, color, pygame.Rect(center[0] - ally.radius, center[1] - ally.radius // 2, ally.radius * 2, ally.radius))
-        elif ally.kind == "cheese":
-            points = [(center[0], center[1] - ally.radius), (center[0] + ally.radius, center[1] + ally.radius), (center[0] - ally.radius, center[1] + ally.radius)]
-            pygame.draw.polygon(surface, color, points)
-        elif ally.kind == "tomato":
-            pygame.draw.circle(surface, color, center, ally.radius)
-            pygame.draw.circle(surface, (255, 125, 95), (center[0] - 5, center[1] - 5), max(4, ally.radius // 3))
+        sprite = load_ingredient_sprite(ally.kind, ally.radius)
+        if sprite is not None:
+            rotated = pygame.transform.rotozoom(sprite, -ally.visual_angle, 1.0)
+            rect = rotated.get_rect(center=center)
+            shadow = rotated.copy()
+            shadow.fill((0, 0, 0, 105), special_flags=pygame.BLEND_RGBA_MULT)
+            surface.blit(shadow, rect.move(8, 12))
+            surface.blit(rotated, rect)
         else:
+            pygame.draw.circle(surface, (8, 12, 18), (center[0] + 4, center[1] + 6), ally.radius + 3)
             pygame.draw.circle(surface, color, center, ally.radius)
-            pygame.draw.circle(surface, (65, 36, 24), center, ally.radius, width=4)
-        pygame.draw.circle(surface, (245, 250, 255), center, ally.radius + 3, width=2)
-        draw_text(surface, font, labels.get(ally.kind, "?"), center, (10, 14, 20))
+        pygame.draw.circle(surface, color, center, ally.radius + 8, width=4)
 
 
 def draw_duel_background(surface: pygame.Surface) -> pygame.Rect:
-    surface.fill((0, 0, 0))
-    top_font = pygame.font.SysFont("arial", 74, bold=True)
-    vs_font = pygame.font.SysFont("arial", 86, bold=True)
+    global DUEL_BACKGROUND_CACHE
     arena_rect = pygame.Rect(round(WIDTH * 0.09), round(HEIGHT * 0.21), round(WIDTH * 0.82), round(HEIGHT * 0.57))
-    pygame.draw.rect(surface, (4, 6, 18), arena_rect, border_radius=4)
-    pygame.draw.rect(surface, (230, 238, 255), arena_rect, width=6, border_radius=4)
-    pygame.draw.rect(surface, (80, 112, 176), arena_rect.inflate(-14, -14), width=2, border_radius=4)
+    if DUEL_BACKGROUND_CACHE is not None:
+        surface.blit(DUEL_BACKGROUND_CACHE, (0, 0))
+        return arena_rect
+
+    cached = pygame.Surface((WIDTH, HEIGHT))
+    background = load_kitchen_background()
+    if background is not None:
+        cached.blit(background, (0, 0))
+    else:
+        cached.fill((16, 14, 12))
+    top_font = make_font(66, bold=True)
+    vs_font = make_font(88, bold=True, italic=True)
+    shade = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    shade.fill((0, 0, 0, 90))
+    cached.blit(shade, (0, 0))
+    pygame.draw.rect(cached, (10, 12, 16), arena_rect, border_radius=8)
+    pygame.draw.rect(cached, (255, 242, 204), arena_rect, width=5, border_radius=8)
+    pygame.draw.rect(cached, (159, 210, 255), arena_rect.inflate(-14, -14), width=2, border_radius=8)
     for x in range(arena_rect.left + 80, arena_rect.right, 120):
-        pygame.draw.line(surface, (22, 36, 64), (x, arena_rect.top), (x, arena_rect.bottom), 1)
+        pygame.draw.line(cached, (45, 58, 72), (x, arena_rect.top), (x, arena_rect.bottom), 1)
     for y in range(arena_rect.top + 90, arena_rect.bottom, 120):
-        pygame.draw.line(surface, (22, 36, 64), (arena_rect.left, y), (arena_rect.right, y), 1)
-    draw_text_with_shadow(surface, vs_font, "VS", (WIDTH // 2, round(HEIGHT * 0.12)), (74, 184, 255), (105, 24, 18))
-    draw_text_with_shadow(surface, top_font, "FOOD SKILL BATTLE", (WIDTH // 2, round(HEIGHT * 0.055)), (255, 248, 220))
+        pygame.draw.line(cached, (45, 58, 72), (arena_rect.left, y), (arena_rect.right, y), 1)
+    draw_text_with_shadow(cached, vs_font, "VS", (WIDTH // 2, round(HEIGHT * 0.12)), (115, 218, 255), (80, 20, 12))
+    draw_text_with_shadow(cached, top_font, "FOOD SKILL BATTLE", (WIDTH // 2, round(HEIGHT * 0.055)), (255, 244, 213))
+    DUEL_BACKGROUND_CACHE = cached
+    surface.blit(DUEL_BACKGROUND_CACHE, (0, 0))
     return arena_rect
 
 
 def draw_duel_hud(surface: pygame.Surface, left: DuelBall, right: DuelBall, frame_index: int, total_frames: int) -> None:
-    hud_font = pygame.font.SysFont("arial", 40, bold=True)
-    small_font = pygame.font.SysFont("arial", 30, bold=True)
+    hud_font = make_font(42, bold=True)
+    small_font = make_font(29, bold=True)
     y = round(HEIGHT * 0.825)
     draw_text_with_shadow(surface, hud_font, f"{left.name} HP: {max(0, left.hp)}", (round(WIDTH * 0.25), y), (255, 245, 230))
     draw_text_with_shadow(surface, hud_font, f"{right.name} HP: {max(0, right.hp)}", (round(WIDTH * 0.75), y), (255, 245, 230))
@@ -1058,8 +1129,8 @@ def draw_duel_hud(surface: pygame.Surface, left: DuelBall, right: DuelBall, fram
 def draw_duel_intro(surface: pygame.Surface, frame_index: int, intro_frames: int) -> None:
     if frame_index > intro_frames:
         return
-    intro_font = pygame.font.SysFont("arial", 118, bold=True)
-    small_font = pygame.font.SysFont("arial", 42, bold=True)
+    intro_font = make_font(124, bold=True, italic=True)
+    small_font = make_font(42, bold=True)
     if frame_index <= intro_frames // 2:
         text = "READY"
         color = (255, 238, 128)
@@ -1130,24 +1201,24 @@ def update_duel_ball(
             if paid_cost > 0:
                 ball.hp -= paid_cost
                 ingredient_kinds = ["lettuce", "cheese", "tomato", "meat"]
-                ally_count = max(1, paid_cost // 10)
-                for index in range(ally_count):
-                    angle = 180 + (index - (ally_count - 1) / 2) * 22
-                    spawn_offset = pygame.Vector2(1, 0).rotate(angle) * (ball.radius + 30)
-                    target_direction = target.position - (ball.position + spawn_offset)
-                    if target_direction.length_squared() == 0:
-                        target_direction = pygame.Vector2(-1, 0)
-                    velocity = target_direction.normalize().rotate(rng.uniform(-24, 24)) * 460
-                    allies.append(
-                        IngredientAlly(
-                            kind=ingredient_kinds[index % len(ingredient_kinds)],
-                            position=ball.position + spawn_offset,
-                            velocity=velocity,
-                            radius=18,
-                            damage=ingredient_damage,
-                        )
+                spawn_direction = -direction.normalize()
+                spawn_offset = spawn_direction.rotate(rng.uniform(-18, 18)) * (ball.radius + round(ball.radius * 0.58))
+                spawn_position = ball.position + spawn_offset
+                target_direction = target.position - spawn_position
+                if target_direction.length_squared() == 0:
+                    target_direction = -spawn_direction
+                velocity = target_direction.normalize().rotate(rng.uniform(-16, 16)) * 500
+                ingredient_kind = rng.choice(ingredient_kinds)
+                allies.append(
+                    IngredientAlly(
+                        kind=ingredient_kind,
+                        position=spawn_position,
+                        velocity=velocity,
+                        radius=max(46, round(ball.radius * 0.72)),
+                        damage=ingredient_damage,
                     )
-                effects.append(DuelEffect("ingredient", ball.position.copy(), 36, (126, 235, 95), f"ALLY x{ally_count}"))
+                )
+                effects.append(DuelEffect("ingredient", spawn_position, 36, ingredient_color(ingredient_kind), ingredient_kind.upper()))
                 audio_events.append(AudioEvent(frame_index, "ingredient_spawn"))
             ball.velocity = direction.normalize() * charge_speed
             ball.charge_frames = 36
@@ -1290,6 +1361,8 @@ def update_ingredient_allies(
             desired = direction.normalize() * 420
             ally.velocity = ally.velocity.lerp(desired, 0.035)
         ally.position += ally.velocity / FPS
+        if ally.velocity.length_squared() > 0:
+            ally.visual_angle = ally.velocity.as_polar()[1] + 90
 
         if ally.position.x - ally.radius < arena_rect.left or ally.position.x + ally.radius > arena_rect.right:
             ally.velocity.x *= -1
@@ -1362,8 +1435,8 @@ def handle_duel_collision(
 
 def draw_duel_result(surface: pygame.Surface, winner: DuelBall, loser: DuelBall, frame_index: int, fps: int) -> None:
     draw_duel_background(surface)
-    headline_font = pygame.font.SysFont("arial", 126, bold=True)
-    result_font = pygame.font.SysFont("arial", 56, bold=True)
+    headline_font = make_font(126, bold=True, italic=True)
+    result_font = make_font(56, bold=True)
     draw_text_with_shadow(surface, headline_font, f"{winner.name} WINS", (WIDTH // 2, round(HEIGHT * 0.39)), (105, 234, 143))
     draw_text_with_shadow(surface, result_font, f"Time {frame_index / fps:.2f}s", (WIDTH // 2, round(HEIGHT * 0.51)), (255, 245, 230))
     draw_text_with_shadow(surface, result_font, f"Damage {winner.total_damage_dealt}  Hits {winner.hits}", (WIDTH // 2, round(HEIGHT * 0.58)), (220, 232, 255))
@@ -1524,8 +1597,8 @@ def run_food_duel(
                 winner, loser = (left, right) if left.hp > right.hp else (right, left)
                 result_started_frame = frame_index + 1
 
-            ball_font = pygame.font.SysFont("arial", max(48, round(radius * 0.43)), bold=True)
-            popup_font = pygame.font.SysFont("arial", 62, bold=True)
+            ball_font = make_font(max(48, round(radius * 0.43)), bold=True)
+            popup_font = make_font(62, bold=True, italic=True)
             if winner is None:
                 draw_duel_effects(render_surface, duel_effects)
                 draw_cheese_patches(render_surface, cheese_patches, left, right)
@@ -1561,7 +1634,7 @@ def run_food_duel(
             shake_frames -= 1
             shake_strength = max(4, round(shake_strength * 0.84))
 
-        frame_path = FRAMES_DIR / f"frame_{frame_index:06d}.png"
+        frame_path = FRAMES_DIR / f"frame_{frame_index:06d}.jpg"
         pygame.image.save(render_surface, str(frame_path))
         frames_rendered = frame_index
 
