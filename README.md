@@ -16,7 +16,15 @@ pip install -r requirements.txt
 python src/simulate.py --frames 600 --no-window
 ```
 
-`output/frames/` に `frame_000001.png` から `frame_000600.png` までの PNG フレームが保存されます。既存の PNG フレームは実行前に削除されます。
+`output/frames/` に `frame_000001.png` から PNG フレームが保存されます。既存の PNG フレームは実行前に削除されます。
+
+現在のMVPでは、画面上部にHP 10000のボスとHPバーが表示されます。ボールがボスに衝突すると10ダメージを与えます。制限フレーム内にHPが0になれば `CLEAR`、倒せなければ `FAILED` です。結果は `output/metadata/simulation_result.json` に保存されます。
+
+CLEAR確認用の短い実行例:
+
+```powershell
+python src/simulate.py --frames 600 --no-window --boss-hp 10 --damage 10
+```
 
 画面表示ありで確認する場合:
 
