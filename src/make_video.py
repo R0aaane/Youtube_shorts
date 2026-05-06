@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import argparse
+import json
 import shutil
 import subprocess
 import sys
@@ -7,11 +9,14 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_CONFIG_PATH = PROJECT_ROOT / "configs" / "boss_battle_001.json"
 FRAMES_DIR = PROJECT_ROOT / "output" / "frames"
 VIDEOS_DIR = PROJECT_ROOT / "output" / "videos"
 INPUT_PATTERN = FRAMES_DIR / "frame_%06d.png"
-OUTPUT_VIDEO = VIDEOS_DIR / "simulation_001.mp4"
-FPS = 60
+DEFAULT_OUTPUT_NAME = "simulation_001"
+DEFAULT_FPS = 60
+DEFAULT_WIDTH = 1080
+DEFAULT_HEIGHT = 1920
 
 
 def ensure_ffmpeg() -> str:
@@ -38,16 +43,38 @@ def ensure_frames_exist() -> None:
         )
 
 
-def make_video() -> Path:
+def load_video_config(path: Path | None) -> dict:
+    config = {
+        "fps": DEFAULT_FPS,
+        "video_width": DEFAULT_WIDTH,
+        "video_height": DEFAULT_HEIGHT,
+        "output_name": DEFAULT_OUTPUT_NAME,
+    }
+    if path is not None:
+        config_path = path if path.is_absolute() else PROJECT_ROOT / path
+        config.update(json.loads(config_path.read_text(encoding="utf-8")))
+    elif DEFAULT_CONFIG_PATH.exists():
+        config.update(json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8")))
+    return config
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Convert rendered PNG frames to MP4.")
+    parser.add_argument("--config", type=Path, help="Path to a simulation JSON config.")
+    return parser.parse_args()
+
+
+def make_video(config: dict) -> Path:
     ffmpeg_path = ensure_ffmpeg()
     ensure_frames_exist()
     VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
+    output_video = VIDEOS_DIR / f"{config['output_name']}.mp4"
 
     command = [
         ffmpeg_path,
         "-y",
         "-framerate",
-        str(FPS),
+        str(config["fps"]),
         "-i",
         str(INPUT_PATTERN),
         "-c:v",
@@ -55,19 +82,21 @@ def make_video() -> Path:
         "-pix_fmt",
         "yuv420p",
         "-vf",
-        "scale=1080:1920:flags=lanczos",
+        f"scale={config['video_width']}:{config['video_height']}:flags=lanczos",
         "-movflags",
         "+faststart",
-        str(OUTPUT_VIDEO),
+        str(output_video),
     ]
 
     subprocess.run(command, check=True)
-    return OUTPUT_VIDEO
+    return output_video
 
 
 def main() -> int:
+    args = parse_args()
+    config = load_video_config(args.config)
     try:
-        output_path = make_video()
+        output_path = make_video(config)
     except (FileNotFoundError, RuntimeError, subprocess.CalledProcessError) as exc:
         print(f"Video generation failed: {exc}", file=sys.stderr)
         return 1

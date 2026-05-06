@@ -10,45 +10,50 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+## JSON設定ファイル
+
+標準設定は `configs/boss_battle_001.json` です。
+
+```json
+{
+  "video_width": 1080,
+  "video_height": 1920,
+  "fps": 60,
+  "duration_seconds": 10,
+  "initial_ball_count": 10,
+  "boss_hp": 10000,
+  "base_damage": 10,
+  "item_spawn_interval": 75,
+  "random_seed": 1,
+  "output_name": "simulation_001"
+}
+```
+
+JSONを書き換えるだけで、ボール数、ボスHP、ダメージ、アイテム出現間隔、乱数シード、動画名を変更できます。同じ `random_seed` なら同じ結果になりやすくなります。
+
 ## フレーム生成
 
 ```powershell
-python src/simulate.py --frames 600 --no-window
+python src/simulate.py --config configs/boss_battle_001.json --no-window
 ```
 
-`output/frames/` に `frame_000001.png` から PNG フレームが保存されます。既存の PNG フレームは実行前に削除されます。
+`duration_seconds * fps` 枚のPNGが `output/frames/` に保存されます。標準設定では600フレームです。既存のPNGフレームは実行前に削除されます。
 
-主なオプション:
+CLIで一部だけ上書きすることもできます。
 
 ```powershell
-python src/simulate.py --frames 600 --no-window --balls 10 --boss-hp 10000 --damage 10 --seed 1
+python src/simulate.py --config configs/boss_battle_001.json --no-window --balls 20 --boss-hp 20000
 ```
 
-- `--balls`: 初期ボール数。デフォルトは `10`
-- `--boss-hp`: ボス初期HP。デフォルトは `10000`
-- `--damage`: 各ボールの初期ダメージ。デフォルトは `10`
-- `--seed`: ランダム生成のシード
-- `--window`: 画面に収まる縮小プレビューを表示
-- `--no-window`: ヘッドレスでフレーム生成
-
-## ボスとアイテム
-
-画面上部に HP ボス、HP バー、HP 数値を表示します。ボールがボスに衝突すると、そのボールの現在ダメージ分だけ HP が減ります。
-
-一定間隔でアイテムが出現します。ボールが触れると短いリングエフェクトが出て、ボールが強化されます。
-
-- `damage_up`: 取得したボールのダメージを増やす
-- `speed_up`: 取得したボールの速度を少し上げる
-
-制限フレーム内に HP が 0 になれば `CLEAR`、倒せなければ `FAILED` です。結果は `output/metadata/simulation_result.json` に保存されます。
-
-CLEAR確認用の短い実行例:
+## 画面表示ありで確認
 
 ```powershell
-python src/simulate.py --frames 600 --no-window --boss-hp 100 --damage 20
+python src/simulate.py --config configs/boss_battle_001.json --window
 ```
 
-## MP4 動画生成
+ウィンドウ表示時は、生成フレームを画面に収まるよう縮小表示します。保存されるPNGは設定ファイルの解像度のままです。
+
+## MP4動画生成
 
 動画生成には FFmpeg が必要です。`ffmpeg` コマンドが PATH から実行できる状態にしてください。
 
@@ -56,10 +61,10 @@ python src/simulate.py --frames 600 --no-window --boss-hp 100 --damage 20
 ffmpeg -version
 ```
 
-フレーム生成後、次のコマンドで MP4 を作成します。
+フレーム生成後、次のコマンドでMP4を作成します。
 
 ```powershell
-python src/make_video.py
+python src/make_video.py --config configs/boss_battle_001.json
 ```
 
 入力:
@@ -71,20 +76,19 @@ output/frames/frame_%06d.png
 出力:
 
 ```text
-output/videos/simulation_001.mp4
+output/videos/<output_name>.mp4
 ```
 
-動画は 60fps、1080x1920、H.264、`yuv420p`、faststart 付きの YouTube にアップロードしやすい MP4 として生成されます。
+標準設定では `output/videos/simulation_001.mp4` が生成されます。動画は設定ファイルの `fps` と解像度を使い、H.264、`yuv420p`、faststart 付きのMP4として生成されます。
 
 ## 現在の範囲
 
-- 画面サイズ: 1080x1920
-- FPS: 60
 - 物理エンジン: pymunk
 - 描画: pygame-ce
-- 初期ボール数: 10
 - 重力: なし
+- ボスHPとHPバー表示
+- 複数ボール
 - アイテム: `damage_up`, `speed_up`
 - フレーム出力: `output/frames/`
-- 動画出力: `output/videos/simulation_001.mp4`
-- YouTube アップロード: 未実装
+- 動画出力: `output/videos/<output_name>.mp4`
+- YouTubeアップロード: 未実装

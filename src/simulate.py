@@ -11,6 +11,7 @@ import pymunk
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_CONFIG_PATH = PROJECT_ROOT / "configs" / "boss_battle_001.json"
 FRAMES_DIR = PROJECT_ROOT / "output" / "frames"
 METADATA_DIR = PROJECT_ROOT / "output" / "metadata"
 RESULT_PATH = METADATA_DIR / "simulation_result.json"
@@ -29,13 +30,44 @@ BOSS_RECT = pygame.Rect(260, 240, 560, 180)
 HP_BAR_RECT = pygame.Rect(80, 64, 920, 42)
 HIT_COOLDOWN_FRAMES = 5
 ITEM_RADIUS = 28
-ITEM_INTERVAL_FRAMES = 75
 ITEM_START_FRAME = 45
 EFFECT_FRAMES = 26
 MAX_ITEMS = 8
 MAX_BALL_SPEED = 1800
 CLEAR = "CLEAR"
 FAILED = "FAILED"
+
+
+@dataclass
+class SimulationConfig:
+    video_width: int = WIDTH
+    video_height: int = HEIGHT
+    fps: int = FPS
+    duration_seconds: int = 10
+    initial_ball_count: int = DEFAULT_BALLS
+    boss_hp: int = BOSS_MAX_HP
+    base_damage: int = BALL_DAMAGE
+    item_spawn_interval: int = 75
+    random_seed: int = 1
+    output_name: str = "simulation_001"
+
+    @property
+    def frame_count(self) -> int:
+        return self.fps * self.duration_seconds
+
+
+DEFAULT_CONFIG = {
+    "video_width": WIDTH,
+    "video_height": HEIGHT,
+    "fps": FPS,
+    "duration_seconds": 10,
+    "initial_ball_count": DEFAULT_BALLS,
+    "boss_hp": BOSS_MAX_HP,
+    "base_damage": BALL_DAMAGE,
+    "item_spawn_interval": 75,
+    "random_seed": 1,
+    "output_name": "simulation_001",
+}
 
 
 @dataclass
@@ -59,6 +91,32 @@ class Effect:
     kind: str
     position: pygame.Vector2
     frames_left: int = EFFECT_FRAMES
+
+
+def update_layout(width: int, height: int) -> None:
+    global WIDTH, HEIGHT, BOSS_RECT, HP_BAR_RECT
+    WIDTH = width
+    HEIGHT = height
+    boss_width = round(width * 0.52)
+    boss_height = round(height * 0.094)
+    BOSS_RECT = pygame.Rect((width - boss_width) // 2, round(height * 0.125), boss_width, boss_height)
+    HP_BAR_RECT = pygame.Rect(round(width * 0.074), round(height * 0.033), round(width * 0.852), round(height * 0.022))
+
+
+def ensure_default_config(path: Path = DEFAULT_CONFIG_PATH) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        path.write_text(json.dumps(DEFAULT_CONFIG, indent=2), encoding="utf-8")
+    return path
+
+
+def load_config(path: Path | None) -> SimulationConfig:
+    config_data = DEFAULT_CONFIG.copy()
+    if path is not None:
+        config_path = path if path.is_absolute() else PROJECT_ROOT / path
+        loaded = json.loads(config_path.read_text(encoding="utf-8"))
+        config_data.update(loaded)
+    return SimulationConfig(**config_data)
 
 
 def add_walls(space: pymunk.Space) -> None:
@@ -281,11 +339,12 @@ def draw(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render a minimal 2D ball simulation.")
-    parser.add_argument("--frames", type=int, default=DEFAULT_FRAMES, help="Number of frames to simulate and save.")
-    parser.add_argument("--balls", type=int, default=DEFAULT_BALLS, help="Initial number of balls.")
-    parser.add_argument("--boss-hp", type=int, default=BOSS_MAX_HP, help="Initial boss HP.")
-    parser.add_argument("--damage", type=int, default=BALL_DAMAGE, help="Damage dealt when the ball hits the boss.")
-    parser.add_argument("--seed", type=int, default=1, help="Random seed for reproducible simulations.")
+    parser.add_argument("--config", type=Path, help="Path to a simulation JSON config.")
+    parser.add_argument("--frames", type=int, help="Number of frames to simulate and save.")
+    parser.add_argument("--balls", type=int, help="Initial number of balls.")
+    parser.add_argument("--boss-hp", type=int, help="Initial boss HP.")
+    parser.add_argument("--damage", type=int, help="Damage dealt when the ball hits the boss.")
+    parser.add_argument("--seed", type=int, help="Random seed for reproducible simulations.")
     window_group = parser.add_mutually_exclusive_group()
     window_group.add_argument("--window", action="store_true", help="Show a scaled preview window while generating.")
     window_group.add_argument("--no-window", action="store_true", help="Generate frames without opening a window.")
@@ -297,7 +356,17 @@ def write_result(result: dict) -> None:
     RESULT_PATH.write_text(json.dumps(result, indent=2), encoding="utf-8")
 
 
-def run(frame_count: int, show_window: bool, ball_count: int, boss_max_hp: int, damage: int, seed: int) -> dict:
+def run(
+    frame_count: int,
+    show_window: bool,
+    ball_count: int,
+    boss_max_hp: int,
+    damage: int,
+    seed: int,
+    fps: int,
+    item_spawn_interval: int,
+    output_name: str,
+) -> dict:
     if frame_count < 1:
         raise ValueError("--frames must be 1 or greater.")
     if ball_count < 1:
@@ -306,6 +375,10 @@ def run(frame_count: int, show_window: bool, ball_count: int, boss_max_hp: int, 
         raise ValueError("--boss-hp must be 1 or greater.")
     if damage < 1:
         raise ValueError("--damage must be 1 or greater.")
+    if fps < 1:
+        raise ValueError("fps must be 1 or greater.")
+    if item_spawn_interval < 1:
+        raise ValueError("item_spawn_interval must be 1 or greater.")
 
     pygame.init()
     render_surface = pygame.Surface((WIDTH, HEIGHT))
@@ -348,7 +421,7 @@ def run(frame_count: int, show_window: bool, ball_count: int, boss_max_hp: int, 
                 write_result(result)
                 return result
 
-        if frame_index >= ITEM_START_FRAME and (frame_index - ITEM_START_FRAME) % ITEM_INTERVAL_FRAMES == 0:
+        if frame_index >= ITEM_START_FRAME and (frame_index - ITEM_START_FRAME) % item_spawn_interval == 0:
             if len(items) < MAX_ITEMS:
                 items.append(spawn_item(rng, balls, item_spawn_count))
                 item_spawn_count += 1
@@ -377,12 +450,12 @@ def run(frame_count: int, show_window: bool, ball_count: int, boss_max_hp: int, 
             scaled_surface = pygame.transform.smoothscale(render_surface, preview_screen.get_size())
             preview_screen.blit(scaled_surface, (0, 0))
             pygame.display.flip()
-            clock.tick(FPS)
+            clock.tick(fps)
 
         if status == CLEAR:
             break
 
-        space.step(1 / FPS)
+        space.step(1 / fps)
 
     if status is None:
         status = FAILED
@@ -403,6 +476,12 @@ def run(frame_count: int, show_window: bool, ball_count: int, boss_max_hp: int, 
         "max_ball_damage": max(ball.damage for ball in balls),
         "max_speed_level": max(ball.speed_level for ball in balls),
         "frames_rendered": frames_rendered,
+        "fps": fps,
+        "video_width": WIDTH,
+        "video_height": HEIGHT,
+        "item_spawn_interval": item_spawn_interval,
+        "random_seed": seed,
+        "output_name": output_name,
     }
     write_result(result)
     print(json.dumps(result, indent=2))
@@ -411,14 +490,30 @@ def run(frame_count: int, show_window: bool, ball_count: int, boss_max_hp: int, 
 
 def main() -> None:
     args = parse_args()
+    ensure_default_config()
+    config = load_config(args.config)
+    if args.frames is not None:
+        frame_count = args.frames
+    else:
+        frame_count = config.frame_count
+
+    ball_count = args.balls if args.balls is not None else config.initial_ball_count
+    boss_hp = args.boss_hp if args.boss_hp is not None else config.boss_hp
+    damage = args.damage if args.damage is not None else config.base_damage
+    seed = args.seed if args.seed is not None else config.random_seed
+    update_layout(config.video_width, config.video_height)
+
     show_window = args.window and not args.no_window
     run(
-        frame_count=args.frames,
+        frame_count=frame_count,
         show_window=show_window,
-        ball_count=args.balls,
-        boss_max_hp=args.boss_hp,
-        damage=args.damage,
-        seed=args.seed,
+        ball_count=ball_count,
+        boss_max_hp=boss_hp,
+        damage=damage,
+        seed=seed,
+        fps=config.fps,
+        item_spawn_interval=config.item_spawn_interval,
+        output_name=config.output_name,
     )
 
 
