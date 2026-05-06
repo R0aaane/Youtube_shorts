@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 0.4.1 - 2026-05-06
+
+### Changed
+
+- Improved food duel skill readability with visible Burn flames, damage-over-time ticks, Charge trails, and impact shockwaves.
+- Documented the visible food duel skill effects in the README.
+
 ## 0.4.0 - 2026-05-06
 
 ### Added

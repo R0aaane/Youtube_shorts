@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 import random
 from pathlib import Path
@@ -144,6 +144,16 @@ class DuelBall:
     burn_tick: int = 0
     total_damage_dealt: int = 0
     hits: int = 0
+    trail: list[pygame.Vector2] = field(default_factory=list)
+
+
+@dataclass
+class DuelEffect:
+    kind: str
+    position: pygame.Vector2
+    frames_left: int
+    color: tuple[int, int, int]
+    label: str = ""
 
 
 def update_layout(width: int, height: int) -> None:
@@ -776,6 +786,31 @@ def draw_scaled_food_skin(surface: pygame.Surface, skin: str, position: tuple[in
 
 def draw_duel_ball(surface: pygame.Surface, ball: DuelBall, font: pygame.font.Font) -> None:
     position = (round(ball.position.x), round(ball.position.y))
+    if ball.charge_frames > 0 and len(ball.trail) > 1:
+        for index, trail_position in enumerate(ball.trail[-8:]):
+            ratio = (index + 1) / min(8, len(ball.trail))
+            trail_radius = round(ball.radius * (0.34 + ratio * 0.2))
+            trail_color = pygame.Color(79, 210, 255).lerp(pygame.Color(255, 255, 255), ratio * 0.35)
+            pygame.draw.circle(
+                surface,
+                trail_color,
+                (round(trail_position.x), round(trail_position.y)),
+                trail_radius,
+                width=max(4, round(10 * ratio)),
+            )
+
+    if ball.burn_frames > 0:
+        pulse = 1 + ((ball.burn_frames % 18) / 18) * 0.16
+        flame_radius = round(ball.radius * pulse)
+        pygame.draw.circle(surface, (255, 88, 32), position, flame_radius + 18, width=10)
+        pygame.draw.circle(surface, (255, 211, 72), position, flame_radius + 4, width=7)
+        for angle in range(0, 360, 45):
+            offset = pygame.Vector2(1, 0).rotate(angle) * (ball.radius + 24)
+            tip = pygame.Vector2(position) + offset
+            left = pygame.Vector2(position) + offset.rotate(9) * 0.86
+            right = pygame.Vector2(position) + offset.rotate(-9) * 0.86
+            pygame.draw.polygon(surface, (255, 115, 36), [tip, left, right])
+
     pygame.draw.circle(surface, (3, 8, 18), (position[0] + 11, position[1] + 14), ball.radius + 8)
     pygame.draw.circle(surface, (242, 248, 255), position, ball.radius + 10)
     pygame.draw.circle(surface, ball.color, position, ball.radius)
@@ -784,6 +819,34 @@ def draw_duel_ball(surface: pygame.Surface, ball: DuelBall, font: pygame.font.Fo
     pygame.draw.circle(surface, (8, 16, 30), position, ball.radius, width=6)
     draw_scaled_food_skin(surface, ball.skin, position, ball.radius)
     draw_text_with_shadow(surface, font, str(max(0, ball.hp)), position, (255, 255, 255))
+    if ball.charge_frames > 0:
+        label_font = pygame.font.SysFont("arial", 34, bold=True)
+        draw_text_with_shadow(surface, label_font, "CHARGE", (position[0], position[1] - ball.radius - 44), (105, 225, 255))
+    elif ball.burn_frames > 0:
+        label_font = pygame.font.SysFont("arial", 34, bold=True)
+        draw_text_with_shadow(surface, label_font, "BURN", (position[0], position[1] - ball.radius - 44), (255, 172, 58))
+
+
+def draw_duel_effects(surface: pygame.Surface, effects: list[DuelEffect]) -> None:
+    label_font = pygame.font.SysFont("arial", 42, bold=True)
+    for effect in effects:
+        progress = 1 - effect.frames_left / max(1, 36)
+        center = (round(effect.position.x), round(effect.position.y))
+        if effect.kind == "impact":
+            radius = round(70 + progress * 115)
+            pygame.draw.circle(surface, effect.color, center, radius, width=8)
+            pygame.draw.circle(surface, (255, 255, 255), center, max(20, radius // 2), width=3)
+        elif effect.kind == "burn":
+            radius = round(60 + progress * 70)
+            pygame.draw.circle(surface, (255, 78, 28), center, radius, width=8)
+            pygame.draw.circle(surface, (255, 220, 78), center, radius - 18, width=5)
+            if effect.label:
+                draw_text_with_shadow(surface, label_font, effect.label, (center[0], center[1] - radius - 24), effect.color)
+        elif effect.kind == "charge":
+            radius = round(50 + progress * 90)
+            pygame.draw.circle(surface, (86, 220, 255), center, radius, width=7)
+            if effect.label:
+                draw_text_with_shadow(surface, label_font, effect.label, (center[0], center[1] - radius - 22), effect.color)
 
 
 def draw_duel_background(surface: pygame.Surface) -> pygame.Rect:
@@ -819,14 +882,22 @@ def draw_duel_hud(surface: pygame.Surface, left: DuelBall, right: DuelBall, fram
     pygame.draw.rect(surface, (255, 42, 130), pygame.Rect(68, HEIGHT - 74, round((WIDTH - 136) * progress), 9))
 
 
-def apply_duel_skill(attacker: DuelBall, defender: DuelBall, base_damage: int, rng: random.Random) -> int:
+def apply_duel_skill(
+    attacker: DuelBall,
+    defender: DuelBall,
+    base_damage: int,
+    rng: random.Random,
+    effects: list[DuelEffect],
+) -> int:
     damage = base_damage
     if attacker.skin == "pizza":
         damage += 12
         defender.burn_frames = 90
         defender.burn_tick = 15
+        effects.append(DuelEffect("burn", defender.position.copy(), 36, (255, 172, 58), "BURN"))
     elif attacker.skin == "burger" and attacker.charge_frames > 0:
         damage += 35
+        effects.append(DuelEffect("charge", defender.position.copy(), 30, (105, 225, 255), "CHARGE HIT"))
     elif attacker.skin == "sushi":
         attacker.hp = min(attacker.max_hp, attacker.hp + 14)
     elif attacker.skin == "taco" and rng.random() < 0.35:
@@ -845,6 +916,10 @@ def update_duel_ball(ball: DuelBall, target: DuelBall, arena_rect: pygame.Rect, 
         ball.hit_cooldown -= 1
     if ball.charge_frames > 0:
         ball.charge_frames -= 1
+
+    ball.trail.append(ball.position.copy())
+    if len(ball.trail) > 10:
+        ball.trail.pop(0)
 
     if ball.skin == "burger" and ball.skill_cooldown == 0:
         direction = target.position - ball.position
@@ -873,7 +948,7 @@ def update_duel_ball(ball: DuelBall, target: DuelBall, arena_rect: pygame.Rect, 
         ball.velocity.y = -abs(ball.velocity.y)
 
 
-def apply_burn(ball: DuelBall, popups: list[DamagePopup]) -> int:
+def apply_burn(ball: DuelBall, popups: list[DamagePopup], effects: list[DuelEffect]) -> int:
     if ball.burn_frames <= 0:
         return 0
     ball.burn_frames -= 1
@@ -884,10 +959,18 @@ def apply_burn(ball: DuelBall, popups: list[DamagePopup]) -> int:
     damage = min(ball.hp, 4)
     ball.hp -= damage
     popups.append(DamagePopup(amount=damage, position=ball.position.copy()))
+    effects.append(DuelEffect("burn", ball.position.copy(), 18, (255, 172, 58), "FIRE"))
     return damage
 
 
-def handle_duel_collision(left: DuelBall, right: DuelBall, base_damage: int, popups: list[DamagePopup], rng: random.Random) -> None:
+def handle_duel_collision(
+    left: DuelBall,
+    right: DuelBall,
+    base_damage: int,
+    popups: list[DamagePopup],
+    effects: list[DuelEffect],
+    rng: random.Random,
+) -> None:
     delta = right.position - left.position
     distance = delta.length()
     min_distance = left.radius + right.radius
@@ -900,9 +983,11 @@ def handle_duel_collision(left: DuelBall, right: DuelBall, base_damage: int, pop
     right.position += normal * (overlap / 2)
     left.velocity = left.velocity.reflect(normal)
     right.velocity = right.velocity.reflect(-normal)
+    midpoint = left.position + normal * (min_distance / 2)
+    effects.append(DuelEffect("impact", midpoint, 24, (255, 255, 255)))
 
     if left.hit_cooldown == 0:
-        damage = min(right.hp, apply_duel_skill(left, right, base_damage, rng))
+        damage = min(right.hp, apply_duel_skill(left, right, base_damage, rng, effects))
         right.hp -= damage
         left.total_damage_dealt += damage
         left.hits += 1
@@ -910,7 +995,7 @@ def handle_duel_collision(left: DuelBall, right: DuelBall, base_damage: int, pop
         popups.append(DamagePopup(amount=damage, position=right.position.copy()))
 
     if right.hit_cooldown == 0:
-        damage = min(left.hp, apply_duel_skill(right, left, base_damage, rng))
+        damage = min(left.hp, apply_duel_skill(right, left, base_damage, rng, effects))
         left.hp -= damage
         right.total_damage_dealt += damage
         right.hits += 1
@@ -973,6 +1058,7 @@ def run_food_duel(
         radius=radius,
     )
     popups: list[DamagePopup] = []
+    duel_effects: list[DuelEffect] = []
     result_frame_count = min(fps * 3, max(1, frame_count // 2))
     winner: DuelBall | None = None
     loser: DuelBall | None = None
@@ -991,9 +1077,9 @@ def run_food_duel(
             arena_rect = draw_duel_background(render_surface)
             update_duel_ball(left, right, arena_rect, rng)
             update_duel_ball(right, left, arena_rect, rng)
-            handle_duel_collision(left, right, damage, popups, rng)
-            apply_burn(left, popups)
-            apply_burn(right, popups)
+            handle_duel_collision(left, right, damage, popups, duel_effects, rng)
+            apply_burn(left, popups, duel_effects)
+            apply_burn(right, popups, duel_effects)
 
             if left.hp <= 0 or right.hp <= 0:
                 winner, loser = (left, right) if left.hp > right.hp else (right, left)
@@ -1001,6 +1087,7 @@ def run_food_duel(
 
             ball_font = pygame.font.SysFont("arial", max(48, round(radius * 0.43)), bold=True)
             popup_font = pygame.font.SysFont("arial", 62, bold=True)
+            draw_duel_effects(render_surface, duel_effects)
             draw_duel_ball(render_surface, left, ball_font)
             draw_duel_ball(render_surface, right, ball_font)
 
@@ -1010,6 +1097,9 @@ def run_food_duel(
                 draw_text_with_shadow(render_surface, popup_font, f"-{popup.amount}", center, (255, 238, 96))
                 popup.frames_left -= 1
             popups = [popup for popup in popups if popup.frames_left > 0]
+            for effect in duel_effects:
+                effect.frames_left -= 1
+            duel_effects = [effect for effect in duel_effects if effect.frames_left > 0]
             draw_duel_hud(render_surface, left, right, frame_index)
         else:
             if result_started_frame is None:

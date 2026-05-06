@@ -133,6 +133,7 @@ python src/generate_video.py --config configs/food_duel.json
 ```
 
 This creates a large-ball 1v1 battle where two food balls use their own skills instead of cooperating against a boss. The default matchup is Pizza Burn vs Burger Charge.
+Pizza Burn shows flame rings and damage-over-time ticks. Burger Charge shows a blue dash trail and impact shockwave.
 
 It runs these steps in order:
 
