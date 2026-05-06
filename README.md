@@ -18,13 +18,41 @@ python src/simulate.py --frames 600 --no-window
 
 `output/frames/` に `frame_000001.png` から `frame_000600.png` までの PNG フレームが保存されます。既存の PNG フレームは実行前に削除されます。
 
-## 画面表示ありで確認
+画面表示ありで確認する場合:
 
 ```powershell
 python src/simulate.py --frames 600 --window
 ```
 
 ウィンドウ表示時は、1080x1920 の生成フレームを画面に収まるよう縮小表示します。保存される PNG は 1080x1920 のままです。
+
+## MP4 動画生成
+
+動画生成には FFmpeg が必要です。`ffmpeg` コマンドが PATH から実行できる状態にしてください。
+
+```powershell
+ffmpeg -version
+```
+
+フレーム生成後、次のコマンドで MP4 を作成します。
+
+```powershell
+python src/make_video.py
+```
+
+入力:
+
+```text
+output/frames/frame_%06d.png
+```
+
+出力:
+
+```text
+output/videos/simulation_001.mp4
+```
+
+動画は 60fps、1080x1920、H.264、`yuv420p`、faststart 付きの YouTube にアップロードしやすい MP4 として生成されます。
 
 ## 現在の範囲
 
@@ -35,5 +63,5 @@ python src/simulate.py --frames 600 --window
 - ボール: 1 個
 - 重力: なし
 - フレーム出力: `output/frames/`
-- 動画出力: 未実装
+- 動画出力: `output/videos/simulation_001.mp4`
 - YouTube アップロード: 未実装
