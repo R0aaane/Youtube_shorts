@@ -1,0 +1,28 @@
+{
+  "video": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 60,
+    "duration_seconds": 30
+  },
+  "simulation": {
+    "theme": "Evolving balls vs HP boss",
+    "boss_hp": 100,
+    "ball_count": 3,
+    "ball_radius": 24,
+    "ball_damage": 1,
+    "gravity": [
+      0,
+      900
+    ]
+  },
+  "metadata": {
+    "title": "Evolving Balls vs HP Boss",
+    "description": "A short 2D physics simulation for YouTube Shorts.",
+    "tags": [
+      "simulation",
+      "physics",
+      "shorts"
+    ]
+  }
+}

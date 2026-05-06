@@ -1,0 +1,130 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Type check / lint cache
+.mypy_cache/
+.pyright/
+.ruff_cache/
+
+# =========================
+# Project outputs
+# =========================
+output/
+outputs/
+
+# Generated frame images
+frames/
+output/frames/
+output/videos/
+output/thumbnails/
+output/metadata/
+output/logs/
+
+# Generated media
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+*.gif
+
+# Generated images
+*.png
+*.jpg
+*.jpeg
+*.webp
+
+# Keep asset placeholders if needed
+!assets/
+!assets/**/.gitkeep
+!configs/
+!configs/**/*.json
+
+# =========================
+# YouTube / Google API secrets
+# =========================
+client_secrets.json
+client_secret*.json
+token.json
+credentials.json
+oauth_token.json
+
+# Google API temporary auth files
+*.pickle
+
+# =========================
+# Environment files
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# FFmpeg / logs / temp
+# =========================
+*.log
+*.tmp
+*.temp
+tmp/
+temp/
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+
+# Keep useful VSCode examples if you add them later
+!.vscode/extensions.json
+!.vscode/launch.example.json
+!.vscode/tasks.example.json
+
+# =========================
+# Codex / local agent files
+# =========================
+.codex/
+.codex-session/
