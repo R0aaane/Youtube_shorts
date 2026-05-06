@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## 0.4.0 - 2026-05-06
+
+### Added
+
+- Added a `food_duel` simulation mode where two large food balls fight each other with unique skills.
+- Added `configs/food_duel.json` for a Pizza Burn vs Burger Charge Shorts-style battle.
+- Added duel-specific YouTube metadata and README usage documentation.
+
+## 0.3.0 - 2026-05-06
+
+### Added
+
+- Added a food-themed `food_boss` simulation with pizza, burger, sushi, taco, donut, and fries ball visuals.
+- Added `configs/food_boss.json` for generating a food-focused Shorts-style HP boss battle.
+- Added food-themed YouTube metadata titles, descriptions, and tags.
+
+### Changed
+
+- Documented the food battle generation command in the README.
+
 ## 0.2.0 - 2026-05-06
 
 ### Added

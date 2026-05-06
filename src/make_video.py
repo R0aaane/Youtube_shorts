@@ -65,6 +65,12 @@ def load_video_config(path: Path | None) -> tuple[dict, Path | None]:
         "theme": "boss_battle",
         "fibonacci_count": 50,
         "exponential_count": 50,
+        "food_types": None,
+        "duel_left_food": "pizza",
+        "duel_right_food": "burger",
+        "duel_left_hp": 240,
+        "duel_right_hp": 260,
+        "duel_ball_radius": 118,
     }
     config_path = resolve_config_path(path)
     if config_path is not None:
@@ -120,6 +126,24 @@ def build_title(config: dict, result: dict) -> str:
     if config.get("theme") == "fibonacci_vs_exponential":
         return "100 Fibonacci VS Exponential Balls"
 
+    if config.get("theme") == "food_boss":
+        ball_count = config["initial_ball_count"]
+        boss_hp = config["boss_hp"]
+        status = result.get("status")
+        if status == "CLEAR":
+            clear_time = result.get("clear_time_seconds")
+            if clear_time is not None:
+                return f"Pizza and Burger Balls Beat {boss_hp:,} HP in {clear_time:.2f}s"
+        return f"Can {ball_count} Food Balls Beat a {boss_hp:,} HP Boss?"
+
+    if config.get("theme") == "food_duel":
+        winner = result.get("winner")
+        left = str(config.get("duel_left_food", "pizza")).title()
+        right = str(config.get("duel_right_food", "burger")).title()
+        if winner:
+            return f"{left} VS {right}: {winner} Wins the Food Skill Battle"
+        return f"{left} VS {right}: Food Skill Battle"
+
     ball_count = config["initial_ball_count"]
     boss_hp = config["boss_hp"]
     status = result.get("status")
@@ -136,14 +160,55 @@ def write_youtube_metadata(config: dict, config_path: Path | None, video_path: P
     total_damage = result.get("total_damage", 0)
     boss_hp_end = result.get("boss_hp_end", config["boss_hp"])
 
-    metadata = {
-        "title": build_title(config, result),
-        "description": (
+    if config.get("theme") == "food_duel":
+        left = result.get("left", {})
+        right = result.get("right", {})
+        description = (
+            f"{str(config.get('duel_left_food', 'pizza')).title()} and "
+            f"{str(config.get('duel_right_food', 'burger')).title()} fight one-on-one with unique skills. "
+            f"Winner: {result.get('winner', 'UNKNOWN')}. "
+            f"{left.get('name', 'LEFT')} HP: {left.get('hp_end', 'N/A')}. "
+            f"{right.get('name', 'RIGHT')} HP: {right.get('hp_end', 'N/A')}. #shorts"
+        )
+        tags = [
+            "shorts",
+            "food",
+            "pizza",
+            "burger",
+            "versus",
+            "physics simulation",
+            "2d physics",
+            "pymunk",
+            "pygame",
+            "skill battle",
+            "satisfying",
+        ]
+    elif config.get("theme") == "food_boss":
+        description = (
+            f"{config['initial_ball_count']} pizza, burger, sushi, taco, donut, and fries balls "
+            f"bounce through a food-themed physics battle against a {config['boss_hp']:,} HP boss. "
+            f"Result: {status}. Total damage: {total_damage}. Remaining HP: {boss_hp_end}. #shorts"
+        )
+        tags = [
+            "shorts",
+            "food",
+            "pizza",
+            "burger",
+            "physics simulation",
+            "2d physics",
+            "pymunk",
+            "pygame",
+            "boss battle",
+            "evolving balls",
+            "satisfying",
+        ]
+    else:
+        description = (
             f"{config['initial_ball_count']} evolving physics balls battle a "
             f"{config['boss_hp']:,} HP wall. Result: {status}. "
             f"Total damage: {total_damage}. Remaining HP: {boss_hp_end}. #shorts"
-        ),
-        "tags": [
+        )
+        tags = [
             "shorts",
             "physics simulation",
             "2d physics",
@@ -154,7 +219,12 @@ def write_youtube_metadata(config: dict, config_path: Path | None, video_path: P
             "fibonacci",
             "exponential",
             "math balls",
-        ],
+        ]
+
+    metadata = {
+        "title": build_title(config, result),
+        "description": description,
+        "tags": tags,
         "video_file": relative_path(video_path),
         "config_file": relative_path(config_path) if config_path is not None else None,
         "result": result,

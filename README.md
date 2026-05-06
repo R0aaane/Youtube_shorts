@@ -118,6 +118,22 @@ python src/generate_video.py --config configs/fibonacci_vs_exponential.json
 
 This creates a vertical "100 Fibonacci VS Exponential" simulation with 50 Fibonacci-number balls and 50 exponential-number balls attacking a shared HP wall.
 
+Food-themed Shorts battle:
+
+```powershell
+python src/generate_video.py --config configs/food_boss.json
+```
+
+This creates a vertical food ball battle where pizza, burger, sushi, taco, donut, and fries balls bounce around and attack a hunger HP boss.
+
+Food skill duel:
+
+```powershell
+python src/generate_video.py --config configs/food_duel.json
+```
+
+This creates a large-ball 1v1 battle where two food balls use their own skills instead of cooperating against a boss. The default matchup is Pizza Burn vs Burger Charge.
+
 It runs these steps in order:
 
 1. Generate PNG frames

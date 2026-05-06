@@ -1,0 +1,18 @@
+{
+  "video_width": 1080,
+  "video_height": 1920,
+  "fps": 60,
+  "duration_seconds": 12,
+  "initial_ball_count": 2,
+  "boss_hp": 1,
+  "base_damage": 24,
+  "item_spawn_interval": 60,
+  "random_seed": 607,
+  "output_name": "food_duel",
+  "theme": "food_duel",
+  "duel_left_food": "pizza",
+  "duel_right_food": "burger",
+  "duel_left_hp": 240,
+  "duel_right_hp": 260,
+  "duel_ball_radius": 128
+}

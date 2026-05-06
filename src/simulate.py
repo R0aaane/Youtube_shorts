@@ -54,6 +54,12 @@ class SimulationConfig:
     theme: str = "boss_battle"
     fibonacci_count: int = 50
     exponential_count: int = 50
+    food_types: list[str] | None = None
+    duel_left_food: str = "pizza"
+    duel_right_food: str = "burger"
+    duel_left_hp: int = 240
+    duel_right_hp: int = 260
+    duel_ball_radius: int = 118
 
     @property
     def frame_count(self) -> int:
@@ -74,6 +80,12 @@ DEFAULT_CONFIG = {
     "theme": "boss_battle",
     "fibonacci_count": 50,
     "exponential_count": 50,
+    "food_types": None,
+    "duel_left_food": "pizza",
+    "duel_right_food": "burger",
+    "duel_left_hp": 240,
+    "duel_right_hp": 260,
+    "duel_ball_radius": 118,
 }
 
 
@@ -84,6 +96,7 @@ class BallState:
     damage: int
     team: str = "boss"
     label: str = ""
+    skin: str = "plain"
     color: tuple[int, int, int] = (68, 180, 255)
     hit_cooldown: int = 0
     damage_level: int = 0
@@ -112,6 +125,25 @@ class DamagePopup:
     amount: int
     position: pygame.Vector2
     frames_left: int = POPUP_FRAMES
+
+
+@dataclass
+class DuelBall:
+    name: str
+    skin: str
+    color: tuple[int, int, int]
+    hp: int
+    max_hp: int
+    position: pygame.Vector2
+    velocity: pygame.Vector2
+    radius: int
+    hit_cooldown: int = 0
+    skill_cooldown: int = 0
+    charge_frames: int = 0
+    burn_frames: int = 0
+    burn_tick: int = 0
+    total_damage_dealt: int = 0
+    hits: int = 0
 
 
 def update_layout(width: int, height: int) -> None:
@@ -185,7 +217,7 @@ def add_ball(
     shape.elasticity = 1.0
     shape.friction = 0.0
     space.add(body, shape)
-    return BallState(ball_id=ball_id, body=body, damage=damage, team=team, label=label, color=color)
+    return BallState(ball_id=ball_id, body=body, damage=damage, team=team, label=label, skin=team, color=color)
 
 
 def compact_number(value: int) -> str:
@@ -209,7 +241,42 @@ def exponential_values(count: int, base_damage: int) -> list[int]:
     return [max(1, min(base_damage * (2 ** index), base_damage * 999)) for index in range(count)]
 
 
+FOOD_BALL_STYLES = {
+    "pizza": {"label": "PIZ", "color": (255, 202, 77)},
+    "burger": {"label": "BRG", "color": (188, 118, 60)},
+    "sushi": {"label": "SUS", "color": (246, 246, 238)},
+    "taco": {"label": "TAC", "color": (244, 187, 66)},
+    "donut": {"label": "DON", "color": (229, 133, 181)},
+    "fries": {"label": "FRY", "color": (247, 205, 75)},
+}
+
+
+def food_ball_types(config: SimulationConfig) -> list[str]:
+    requested = config.food_types or ["pizza", "burger", "sushi", "taco", "donut", "fries"]
+    valid = [food for food in requested if food in FOOD_BALL_STYLES]
+    return valid or ["pizza", "burger"]
+
+
 def create_balls(space: pymunk.Space, rng: random.Random, config: SimulationConfig, damage: int) -> list[BallState]:
+    if config.theme == "food_boss":
+        foods = food_ball_types(config)
+        balls: list[BallState] = []
+        for index in range(config.initial_ball_count):
+            food = foods[index % len(foods)]
+            style = FOOD_BALL_STYLES[food]
+            ball = add_ball(
+                space,
+                rng,
+                damage,
+                ball_id=index + 1,
+                team=food,
+                label=style["label"],
+                color=style["color"],
+            )
+            ball.skin = food
+            balls.append(ball)
+        return balls
+
     if config.theme != "fibonacci_vs_exponential":
         return [add_ball(space, rng, damage, ball_id=index + 1) for index in range(config.initial_ball_count)]
 
@@ -416,6 +483,54 @@ def item_color(kind: str) -> tuple[int, int, int]:
     return (99, 220, 156)
 
 
+def draw_food_skin(surface: pygame.Surface, ball: BallState, position: tuple[int, int], radius: int, font: pygame.font.Font) -> None:
+    x, y = position
+    if ball.skin == "pizza":
+        points = [(x - 22, y - 16), (x + 24, y - 7), (x - 8, y + 27)]
+        pygame.draw.polygon(surface, (248, 180, 58), points)
+        pygame.draw.polygon(surface, (176, 95, 38), points, width=4)
+        pygame.draw.circle(surface, (206, 52, 48), (x - 6, y - 4), 5)
+        pygame.draw.circle(surface, (206, 52, 48), (x + 6, y + 7), 5)
+        pygame.draw.circle(surface, (242, 235, 150), (x - 12, y + 10), 4)
+        return
+
+    if ball.skin == "burger":
+        pygame.draw.ellipse(surface, (230, 164, 82), pygame.Rect(x - 24, y - 23, 48, 19))
+        pygame.draw.rect(surface, (82, 132, 54), pygame.Rect(x - 24, y - 7, 48, 7), border_radius=3)
+        pygame.draw.rect(surface, (109, 61, 37), pygame.Rect(x - 25, y, 50, 12), border_radius=5)
+        pygame.draw.ellipse(surface, (238, 190, 102), pygame.Rect(x - 23, y + 9, 46, 16))
+        return
+
+    if ball.skin == "sushi":
+        pygame.draw.ellipse(surface, (246, 246, 238), pygame.Rect(x - 26, y - 18, 52, 36))
+        pygame.draw.ellipse(surface, (235, 93, 86), pygame.Rect(x - 23, y - 13, 46, 26))
+        pygame.draw.line(surface, (255, 214, 204), (x - 10, y - 11), (x + 7, y + 11), 5)
+        return
+
+    if ball.skin == "taco":
+        pygame.draw.arc(surface, (238, 175, 54), pygame.Rect(x - 28, y - 15, 56, 45), 3.14, 6.28, 12)
+        pygame.draw.rect(surface, (96, 145, 58), pygame.Rect(x - 22, y - 4, 44, 10), border_radius=4)
+        pygame.draw.circle(surface, (198, 63, 50), (x - 8, y - 3), 5)
+        pygame.draw.circle(surface, (198, 63, 50), (x + 10, y - 2), 5)
+        return
+
+    if ball.skin == "donut":
+        pygame.draw.circle(surface, (197, 119, 67), position, radius - 7)
+        pygame.draw.circle(surface, (235, 132, 184), position, radius - 13)
+        pygame.draw.circle(surface, (255, 238, 210), position, 11)
+        for dx, dy, color in [(-12, -8, (255, 245, 102)), (10, -7, (92, 206, 255)), (-4, 12, (255, 255, 255))]:
+            pygame.draw.rect(surface, color, pygame.Rect(x + dx, y + dy, 10, 4), border_radius=2)
+        return
+
+    if ball.skin == "fries":
+        pygame.draw.rect(surface, (204, 39, 46), pygame.Rect(x - 20, y - 1, 40, 27), border_radius=5)
+        for dx in [-14, -6, 2, 10]:
+            pygame.draw.rect(surface, (250, 213, 85), pygame.Rect(x + dx, y - 24, 8, 28), border_radius=3)
+        return
+
+    draw_text(surface, font, ball.label or str(ball.damage), position, (7, 20, 32))
+
+
 def draw(
     surface: pygame.Surface,
     background: pygame.Surface,
@@ -448,7 +563,14 @@ def draw(
     boss_inner = BOSS_RECT.inflate(-28, -28)
     pygame.draw.rect(surface, (214, 72, 88), boss_inner, border_radius=10)
     pygame.draw.rect(surface, (230, 236, 242), BOSS_RECT, width=5, border_radius=14)
-    boss_title = "NUMBER HP WALL" if any(ball.team in {"fibonacci", "exponential"} for ball in balls) else "HP BOSS"
+    has_number_theme = any(ball.team in {"fibonacci", "exponential"} for ball in balls)
+    has_food_theme = any(ball.skin in FOOD_BALL_STYLES for ball in balls)
+    if has_number_theme:
+        boss_title = "NUMBER HP WALL"
+    elif has_food_theme:
+        boss_title = "HUNGER HP BOSS"
+    else:
+        boss_title = "HP BOSS"
     draw_text_with_shadow(surface, title_font, boss_title, BOSS_RECT.center, (255, 245, 230))
 
     hp_ratio = boss_hp / boss_max_hp if boss_max_hp > 0 else 0
@@ -479,7 +601,10 @@ def draw(
         highlight = pygame.Color(ball.color).lerp(pygame.Color(255, 255, 255), 0.35)
         pygame.draw.circle(surface, highlight, (position[0] - 9, position[1] - 10), max(8, BALL_RADIUS // 3))
         pygame.draw.circle(surface, (7, 20, 32), position, BALL_RADIUS, width=3)
-        draw_text(surface, item_font, ball.label or str(ball.damage), position, (7, 20, 32))
+        if ball.skin in FOOD_BALL_STYLES:
+            draw_food_skin(surface, ball, position, BALL_RADIUS, item_font)
+        else:
+            draw_text(surface, item_font, ball.label or str(ball.damage), position, (7, 20, 32))
 
     for effect in effects:
         progress = 1 - (effect.frames_left / EFFECT_FRAMES)
@@ -556,8 +681,396 @@ def draw_result_screen(
         row_color = color if index == 0 else (238, 244, 250)
         draw_text_with_shadow(surface, font, row, (WIDTH // 2, start_y + index * row_gap), row_color)
 
-    subtitle = "100 Fibonacci VS Exponential" if top_ball.team in {"fibonacci", "exponential"} else "Evolving Balls vs HP Boss"
+    if top_ball.team in {"fibonacci", "exponential"}:
+        subtitle = "100 Fibonacci VS Exponential"
+    elif top_ball.skin in FOOD_BALL_STYLES:
+        subtitle = "Food Balls vs Hunger HP Boss"
+    else:
+        subtitle = "Evolving Balls vs HP Boss"
     draw_text_with_shadow(surface, small_font, subtitle, (WIDTH // 2, round(HEIGHT * 0.86)), (190, 204, 224))
+
+
+def food_label(food: str) -> str:
+    labels = {
+        "pizza": "PIZZA",
+        "burger": "BURGER",
+        "sushi": "SUSHI",
+        "taco": "TACO",
+        "donut": "DONUT",
+        "fries": "FRIES",
+    }
+    return labels.get(food, food.upper())
+
+
+def duel_skill_name(food: str) -> str:
+    names = {
+        "pizza": "BURN",
+        "burger": "CHARGE",
+        "sushi": "HEAL",
+        "taco": "CRIT",
+        "donut": "SHIELD",
+        "fries": "COMBO",
+    }
+    return names.get(food, "HIT")
+
+
+def draw_scaled_food_skin(surface: pygame.Surface, skin: str, position: tuple[int, int], radius: int) -> None:
+    x, y = position
+    scale = radius / 118
+
+    def rect(dx: int, dy: int, width: int, height: int) -> pygame.Rect:
+        return pygame.Rect(
+            round(x + dx * scale),
+            round(y + dy * scale),
+            round(width * scale),
+            round(height * scale),
+        )
+
+    def point(px: int, py: int) -> tuple[int, int]:
+        return round(x + px * scale), round(y + py * scale)
+
+    if skin == "pizza":
+        points = [point(-70, -48), point(74, -22), point(-18, 82)]
+        pygame.draw.polygon(surface, (250, 184, 54), points)
+        pygame.draw.polygon(surface, (160, 86, 37), points, width=max(5, round(9 * scale)))
+        for px, py in [(-20, -18), (24, 6), (-36, 34)]:
+            pygame.draw.circle(surface, (204, 43, 41), point(px, py), round(11 * scale))
+        for px, py in [(-2, 28), (31, -18)]:
+            pygame.draw.circle(surface, (252, 235, 151), point(px, py), round(8 * scale))
+        return
+
+    if skin == "burger":
+        pygame.draw.ellipse(surface, (232, 166, 80), rect(-72, -62, 144, 48))
+        pygame.draw.rect(surface, (84, 137, 58), rect(-72, -22, 144, 20), border_radius=round(8 * scale))
+        pygame.draw.rect(surface, (105, 58, 36), rect(-76, 0, 152, 34), border_radius=round(14 * scale))
+        pygame.draw.ellipse(surface, (240, 192, 104), rect(-70, 30, 140, 42))
+        return
+
+    if skin == "sushi":
+        pygame.draw.ellipse(surface, (246, 246, 238), rect(-76, -48, 152, 96))
+        pygame.draw.ellipse(surface, (235, 92, 84), rect(-66, -34, 132, 68))
+        pygame.draw.line(surface, (255, 214, 204), point(-28, -32), point(20, 33), max(7, round(13 * scale)))
+        return
+
+    if skin == "taco":
+        pygame.draw.arc(surface, (238, 175, 54), rect(-82, -42, 164, 128), 3.14, 6.28, max(10, round(22 * scale)))
+        pygame.draw.rect(surface, (96, 145, 58), rect(-62, -12, 124, 24), border_radius=round(10 * scale))
+        for px, py in [(-26, -9), (20, -6), (0, 12)]:
+            pygame.draw.circle(surface, (198, 63, 50), point(px, py), round(11 * scale))
+        return
+
+    if skin == "donut":
+        pygame.draw.circle(surface, (197, 119, 67), position, round(radius * 0.72))
+        pygame.draw.circle(surface, (235, 132, 184), position, round(radius * 0.54))
+        pygame.draw.circle(surface, (255, 238, 210), position, round(radius * 0.22))
+        for px, py, color in [(-34, -22, (255, 245, 102)), (22, -24, (92, 206, 255)), (-8, 36, (255, 255, 255))]:
+            pygame.draw.rect(surface, color, rect(px, py, 28, 9), border_radius=round(4 * scale))
+        return
+
+    if skin == "fries":
+        pygame.draw.rect(surface, (204, 39, 46), rect(-54, -2, 108, 76), border_radius=round(10 * scale))
+        for px in [-42, -20, 2, 24]:
+            pygame.draw.rect(surface, (250, 213, 85), rect(px, -72, 18, 82), border_radius=round(6 * scale))
+        return
+
+
+def draw_duel_ball(surface: pygame.Surface, ball: DuelBall, font: pygame.font.Font) -> None:
+    position = (round(ball.position.x), round(ball.position.y))
+    pygame.draw.circle(surface, (3, 8, 18), (position[0] + 11, position[1] + 14), ball.radius + 8)
+    pygame.draw.circle(surface, (242, 248, 255), position, ball.radius + 10)
+    pygame.draw.circle(surface, ball.color, position, ball.radius)
+    glow = pygame.Color(ball.color).lerp(pygame.Color(255, 255, 255), 0.22)
+    pygame.draw.circle(surface, glow, (position[0] - round(ball.radius * 0.25), position[1] - round(ball.radius * 0.28)), round(ball.radius * 0.32))
+    pygame.draw.circle(surface, (8, 16, 30), position, ball.radius, width=6)
+    draw_scaled_food_skin(surface, ball.skin, position, ball.radius)
+    draw_text_with_shadow(surface, font, str(max(0, ball.hp)), position, (255, 255, 255))
+
+
+def draw_duel_background(surface: pygame.Surface) -> pygame.Rect:
+    surface.fill((0, 0, 0))
+    top_font = pygame.font.SysFont("arial", 74, bold=True)
+    vs_font = pygame.font.SysFont("arial", 86, bold=True)
+    arena_rect = pygame.Rect(round(WIDTH * 0.09), round(HEIGHT * 0.21), round(WIDTH * 0.82), round(HEIGHT * 0.57))
+    pygame.draw.rect(surface, (4, 6, 18), arena_rect, border_radius=4)
+    pygame.draw.rect(surface, (230, 238, 255), arena_rect, width=6, border_radius=4)
+    pygame.draw.rect(surface, (80, 112, 176), arena_rect.inflate(-14, -14), width=2, border_radius=4)
+    for x in range(arena_rect.left + 80, arena_rect.right, 120):
+        pygame.draw.line(surface, (22, 36, 64), (x, arena_rect.top), (x, arena_rect.bottom), 1)
+    for y in range(arena_rect.top + 90, arena_rect.bottom, 120):
+        pygame.draw.line(surface, (22, 36, 64), (arena_rect.left, y), (arena_rect.right, y), 1)
+    draw_text_with_shadow(surface, vs_font, "VS", (WIDTH // 2, round(HEIGHT * 0.12)), (74, 184, 255), (105, 24, 18))
+    draw_text_with_shadow(surface, top_font, "FOOD SKILL BATTLE", (WIDTH // 2, round(HEIGHT * 0.055)), (255, 248, 220))
+    return arena_rect
+
+
+def draw_duel_hud(surface: pygame.Surface, left: DuelBall, right: DuelBall, frame_index: int) -> None:
+    hud_font = pygame.font.SysFont("arial", 40, bold=True)
+    small_font = pygame.font.SysFont("arial", 30, bold=True)
+    y = round(HEIGHT * 0.825)
+    draw_text_with_shadow(surface, hud_font, f"{left.name} HP: {max(0, left.hp)}", (round(WIDTH * 0.25), y), (255, 245, 230))
+    draw_text_with_shadow(surface, hud_font, f"{right.name} HP: {max(0, right.hp)}", (round(WIDTH * 0.75), y), (255, 245, 230))
+    draw_text_with_shadow(surface, hud_font, "|", (WIDTH // 2, y), (255, 255, 255))
+    left_cd = max(0, left.skill_cooldown // 60)
+    right_cd = max(0, right.skill_cooldown // 60)
+    draw_text_with_shadow(surface, small_font, f"{left.name}: [{duel_skill_name(left.skin)} {left_cd}]", (round(WIDTH * 0.25), y + 56), (220, 232, 255))
+    draw_text_with_shadow(surface, small_font, f"{right.name}: [{duel_skill_name(right.skin)} {right_cd}]", (round(WIDTH * 0.75), y + 56), (220, 232, 255))
+    progress = min(1.0, frame_index / max(1, FPS * 12))
+    pygame.draw.rect(surface, (58, 58, 58), pygame.Rect(68, HEIGHT - 74, WIDTH - 136, 9))
+    pygame.draw.rect(surface, (255, 42, 130), pygame.Rect(68, HEIGHT - 74, round((WIDTH - 136) * progress), 9))
+
+
+def apply_duel_skill(attacker: DuelBall, defender: DuelBall, base_damage: int, rng: random.Random) -> int:
+    damage = base_damage
+    if attacker.skin == "pizza":
+        damage += 12
+        defender.burn_frames = 90
+        defender.burn_tick = 15
+    elif attacker.skin == "burger" and attacker.charge_frames > 0:
+        damage += 35
+    elif attacker.skin == "sushi":
+        attacker.hp = min(attacker.max_hp, attacker.hp + 14)
+    elif attacker.skin == "taco" and rng.random() < 0.35:
+        damage *= 2
+    elif attacker.skin == "donut":
+        damage = max(1, damage - 6)
+    elif attacker.skin == "fries":
+        damage += 8
+    return damage
+
+
+def update_duel_ball(ball: DuelBall, target: DuelBall, arena_rect: pygame.Rect, rng: random.Random) -> None:
+    if ball.skill_cooldown > 0:
+        ball.skill_cooldown -= 1
+    if ball.hit_cooldown > 0:
+        ball.hit_cooldown -= 1
+    if ball.charge_frames > 0:
+        ball.charge_frames -= 1
+
+    if ball.skin == "burger" and ball.skill_cooldown == 0:
+        direction = target.position - ball.position
+        if direction.length_squared() > 0:
+            ball.velocity = direction.normalize() * 1220
+            ball.charge_frames = 36
+            ball.skill_cooldown = 132
+    elif ball.skill_cooldown == 0:
+        ball.velocity.rotate_ip(rng.uniform(-22, 22))
+        ball.skill_cooldown = 120
+
+    ball.position += ball.velocity / FPS
+
+    if ball.position.x - ball.radius < arena_rect.left:
+        ball.position.x = arena_rect.left + ball.radius
+        ball.velocity.x = abs(ball.velocity.x)
+    elif ball.position.x + ball.radius > arena_rect.right:
+        ball.position.x = arena_rect.right - ball.radius
+        ball.velocity.x = -abs(ball.velocity.x)
+
+    if ball.position.y - ball.radius < arena_rect.top:
+        ball.position.y = arena_rect.top + ball.radius
+        ball.velocity.y = abs(ball.velocity.y)
+    elif ball.position.y + ball.radius > arena_rect.bottom:
+        ball.position.y = arena_rect.bottom - ball.radius
+        ball.velocity.y = -abs(ball.velocity.y)
+
+
+def apply_burn(ball: DuelBall, popups: list[DamagePopup]) -> int:
+    if ball.burn_frames <= 0:
+        return 0
+    ball.burn_frames -= 1
+    ball.burn_tick -= 1
+    if ball.burn_tick > 0:
+        return 0
+    ball.burn_tick = 15
+    damage = min(ball.hp, 4)
+    ball.hp -= damage
+    popups.append(DamagePopup(amount=damage, position=ball.position.copy()))
+    return damage
+
+
+def handle_duel_collision(left: DuelBall, right: DuelBall, base_damage: int, popups: list[DamagePopup], rng: random.Random) -> None:
+    delta = right.position - left.position
+    distance = delta.length()
+    min_distance = left.radius + right.radius
+    if distance <= 0 or distance >= min_distance:
+        return
+
+    normal = delta.normalize()
+    overlap = min_distance - distance
+    left.position -= normal * (overlap / 2)
+    right.position += normal * (overlap / 2)
+    left.velocity = left.velocity.reflect(normal)
+    right.velocity = right.velocity.reflect(-normal)
+
+    if left.hit_cooldown == 0:
+        damage = min(right.hp, apply_duel_skill(left, right, base_damage, rng))
+        right.hp -= damage
+        left.total_damage_dealt += damage
+        left.hits += 1
+        left.hit_cooldown = 28
+        popups.append(DamagePopup(amount=damage, position=right.position.copy()))
+
+    if right.hit_cooldown == 0:
+        damage = min(left.hp, apply_duel_skill(right, left, base_damage, rng))
+        left.hp -= damage
+        right.total_damage_dealt += damage
+        right.hits += 1
+        right.hit_cooldown = 28
+        popups.append(DamagePopup(amount=damage, position=left.position.copy()))
+
+
+def draw_duel_result(surface: pygame.Surface, winner: DuelBall, loser: DuelBall, frame_index: int, fps: int) -> None:
+    draw_duel_background(surface)
+    headline_font = pygame.font.SysFont("arial", 126, bold=True)
+    result_font = pygame.font.SysFont("arial", 56, bold=True)
+    draw_text_with_shadow(surface, headline_font, f"{winner.name} WINS", (WIDTH // 2, round(HEIGHT * 0.39)), (105, 234, 143))
+    draw_text_with_shadow(surface, result_font, f"Time {frame_index / fps:.2f}s", (WIDTH // 2, round(HEIGHT * 0.51)), (255, 245, 230))
+    draw_text_with_shadow(surface, result_font, f"Damage {winner.total_damage_dealt}  Hits {winner.hits}", (WIDTH // 2, round(HEIGHT * 0.58)), (220, 232, 255))
+    draw_text_with_shadow(surface, result_font, f"{loser.name} HP 0", (WIDTH // 2, round(HEIGHT * 0.65)), (255, 118, 118))
+
+
+def run_food_duel(
+    frame_count: int,
+    show_window: bool,
+    damage: int,
+    seed: int,
+    fps: int,
+    output_name: str,
+    config: SimulationConfig,
+) -> dict:
+    pygame.init()
+    render_surface = pygame.Surface((WIDTH, HEIGHT))
+    preview_screen = None
+    clock = pygame.time.Clock()
+    if show_window:
+        preview_size = (round(WIDTH * DISPLAY_SCALE), round(HEIGHT * DISPLAY_SCALE))
+        preview_screen = pygame.display.set_mode(preview_size)
+        pygame.display.set_caption("Food Skill Battle")
+
+    clear_frames_dir()
+    rng = random.Random(seed)
+    radius = config.duel_ball_radius
+    arena_rect = pygame.Rect(round(WIDTH * 0.09), round(HEIGHT * 0.21), round(WIDTH * 0.82), round(HEIGHT * 0.57))
+    left_style = FOOD_BALL_STYLES.get(config.duel_left_food, FOOD_BALL_STYLES["pizza"])
+    right_style = FOOD_BALL_STYLES.get(config.duel_right_food, FOOD_BALL_STYLES["burger"])
+    left = DuelBall(
+        name=food_label(config.duel_left_food),
+        skin=config.duel_left_food,
+        color=left_style["color"],
+        hp=config.duel_left_hp,
+        max_hp=config.duel_left_hp,
+        position=pygame.Vector2(arena_rect.left + radius + 70, arena_rect.centery - 110),
+        velocity=pygame.Vector2(520, 420),
+        radius=radius,
+    )
+    right = DuelBall(
+        name=food_label(config.duel_right_food),
+        skin=config.duel_right_food,
+        color=right_style["color"],
+        hp=config.duel_right_hp,
+        max_hp=config.duel_right_hp,
+        position=pygame.Vector2(arena_rect.right - radius - 70, arena_rect.centery + 110),
+        velocity=pygame.Vector2(-620, -360),
+        radius=radius,
+    )
+    popups: list[DamagePopup] = []
+    result_frame_count = min(fps * 3, max(1, frame_count // 2))
+    winner: DuelBall | None = None
+    loser: DuelBall | None = None
+    result_started_frame: int | None = None
+    frames_rendered = 0
+
+    for frame_index in range(1, frame_count + 1):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                result = {"status": "STOPPED", "frames_rendered": frames_rendered, "theme": config.theme}
+                write_result(result)
+                return result
+
+        if winner is None:
+            arena_rect = draw_duel_background(render_surface)
+            update_duel_ball(left, right, arena_rect, rng)
+            update_duel_ball(right, left, arena_rect, rng)
+            handle_duel_collision(left, right, damage, popups, rng)
+            apply_burn(left, popups)
+            apply_burn(right, popups)
+
+            if left.hp <= 0 or right.hp <= 0:
+                winner, loser = (left, right) if left.hp > right.hp else (right, left)
+                result_started_frame = frame_index + 1
+
+            ball_font = pygame.font.SysFont("arial", max(48, round(radius * 0.43)), bold=True)
+            popup_font = pygame.font.SysFont("arial", 62, bold=True)
+            draw_duel_ball(render_surface, left, ball_font)
+            draw_duel_ball(render_surface, right, ball_font)
+
+            for popup in popups:
+                progress = 1 - (popup.frames_left / POPUP_FRAMES)
+                center = (round(popup.position.x), round(popup.position.y - progress * 88))
+                draw_text_with_shadow(render_surface, popup_font, f"-{popup.amount}", center, (255, 238, 96))
+                popup.frames_left -= 1
+            popups = [popup for popup in popups if popup.frames_left > 0]
+            draw_duel_hud(render_surface, left, right, frame_index)
+        else:
+            if result_started_frame is None:
+                result_started_frame = frame_index
+            draw_duel_result(render_surface, winner, loser or left, frame_index, fps)
+
+        frame_path = FRAMES_DIR / f"frame_{frame_index:06d}.png"
+        pygame.image.save(render_surface, str(frame_path))
+        frames_rendered = frame_index
+
+        if preview_screen is not None:
+            scaled_surface = pygame.transform.smoothscale(render_surface, preview_screen.get_size())
+            preview_screen.blit(scaled_surface, (0, 0))
+            pygame.display.flip()
+            clock.tick(fps)
+
+        if winner is not None and result_started_frame is not None:
+            if frame_index - result_started_frame + 1 >= result_frame_count:
+                break
+
+    if winner is None:
+        winner, loser = (left, right) if left.hp >= right.hp else (right, left)
+        result_started_frame = frames_rendered
+
+    pygame.quit()
+    result = {
+        "status": "CLEAR",
+        "theme": config.theme,
+        "winner": winner.name,
+        "loser": loser.name if loser is not None else None,
+        "left": {
+            "name": left.name,
+            "food": left.skin,
+            "hp_start": left.max_hp,
+            "hp_end": max(0, left.hp),
+            "skill": duel_skill_name(left.skin),
+            "hits": left.hits,
+            "total_damage_dealt": left.total_damage_dealt,
+        },
+        "right": {
+            "name": right.name,
+            "food": right.skin,
+            "hp_start": right.max_hp,
+            "hp_end": max(0, right.hp),
+            "skill": duel_skill_name(right.skin),
+            "hits": right.hits,
+            "total_damage_dealt": right.total_damage_dealt,
+        },
+        "base_damage": damage,
+        "ball_radius": radius,
+        "frames_rendered": frames_rendered,
+        "result_started_frame": result_started_frame,
+        "fps": fps,
+        "video_width": WIDTH,
+        "video_height": HEIGHT,
+        "random_seed": seed,
+        "output_name": output_name,
+    }
+    write_result(result)
+    print(json.dumps(result, indent=2))
+    return result
 
 
 def parse_args() -> argparse.Namespace:
@@ -604,6 +1117,29 @@ def run(
     if item_spawn_interval < 1:
         raise ValueError("item_spawn_interval must be 1 or greater.")
 
+    run_config = config or SimulationConfig(
+        video_width=WIDTH,
+        video_height=HEIGHT,
+        fps=fps,
+        duration_seconds=max(1, frame_count // fps),
+        initial_ball_count=ball_count,
+        boss_hp=boss_max_hp,
+        base_damage=damage,
+        item_spawn_interval=item_spawn_interval,
+        random_seed=seed,
+        output_name=output_name,
+    )
+    if run_config.theme == "food_duel":
+        return run_food_duel(
+            frame_count=frame_count,
+            show_window=show_window,
+            damage=damage,
+            seed=seed,
+            fps=fps,
+            output_name=output_name,
+            config=run_config,
+        )
+
     pygame.init()
     render_surface = pygame.Surface((WIDTH, HEIGHT))
     background = create_background()
@@ -621,18 +1157,6 @@ def run(
     space = pymunk.Space()
     space.gravity = 0, 0
     add_walls(space)
-    run_config = config or SimulationConfig(
-        video_width=WIDTH,
-        video_height=HEIGHT,
-        fps=fps,
-        duration_seconds=max(1, frame_count // fps),
-        initial_ball_count=ball_count,
-        boss_hp=boss_max_hp,
-        base_damage=damage,
-        item_spawn_interval=item_spawn_interval,
-        random_seed=seed,
-        output_name=output_name,
-    )
     balls = create_balls(space, rng, run_config, damage)
     items: list[Item] = []
     effects: list[Effect] = []

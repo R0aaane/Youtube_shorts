@@ -1,0 +1,21 @@
+{
+  "video_width": 1080,
+  "video_height": 1920,
+  "fps": 60,
+  "duration_seconds": 12,
+  "initial_ball_count": 48,
+  "boss_hp": 4300,
+  "base_damage": 45,
+  "item_spawn_interval": 40,
+  "random_seed": 506,
+  "output_name": "food_boss",
+  "theme": "food_boss",
+  "food_types": [
+    "pizza",
+    "burger",
+    "sushi",
+    "taco",
+    "donut",
+    "fries"
+  ]
+}
