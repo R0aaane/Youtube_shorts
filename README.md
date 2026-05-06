@@ -145,9 +145,9 @@ The metadata includes:
 
 The title is generated in English for Shorts, the description includes `#shorts`, and `tags` is a JSON array. This metadata is only saved locally; YouTube upload is not implemented.
 
-## YouTube Upload Preparation
+## YouTube Upload
 
-`src/upload_youtube.py` is a safe upload preparation stub. It reads a metadata JSON file and prints the upload payload, but it does not upload to YouTube.
+`src/upload_youtube.py` reads a generated metadata JSON file and can upload the matching MP4 with the YouTube Data API. The default privacy status is always `private`.
 
 Dry-run preview:
 
@@ -161,19 +161,14 @@ List available metadata files:
 python src/upload_youtube.py --list
 ```
 
-The default privacy status is `private`.
-
-```powershell
-python src/upload_youtube.py --metadata output/metadata/simulation_001.json --dry-run --privacy-status private
-```
-
-Before real upload support is added later:
+OAuth setup:
 
 1. Create a Google Cloud project.
 2. Enable the YouTube Data API v3.
-3. Create OAuth client credentials for a desktop app.
-4. Download the OAuth file as `client_secrets.json`.
-5. Place `client_secrets.json` at the project root only on your local machine.
+3. Configure the OAuth consent screen.
+4. Create OAuth client credentials for a desktop app.
+5. Download the credentials JSON.
+6. Save it as `client_secrets.json` at the project root.
 
 Do not commit credentials. `.gitignore` excludes:
 
@@ -184,7 +179,21 @@ Do not commit credentials. `.gitignore` excludes:
 - `oauth_token.json`
 - `output/`
 
-Actual upload is intentionally not implemented yet. Running with `--no-dry-run` exits with an error instead of uploading.
+First private upload:
+
+```powershell
+python src/upload_youtube.py --metadata output/metadata/simulation_001.json --privacy private
+```
+
+On the first upload, a browser-based OAuth flow opens. After authorization, `token.json` is saved locally and reused for later uploads.
+
+To upload as `unlisted` or `public`, you must explicitly choose it:
+
+```powershell
+python src/upload_youtube.py --metadata output/metadata/simulation_001.json --privacy unlisted
+```
+
+The script sends `title`, `description`, and `tags` from the metadata JSON to YouTube.
 
 ## Current Scope
 
@@ -197,4 +206,4 @@ Actual upload is intentionally not implemented yet. Running with `--no-dry-run` 
 - Result screen
 - Frame output: `output/frames/`
 - Video output: `output/videos/<output_name>.mp4`
-- YouTube upload: dry-run preparation only
+- YouTube upload: OAuth private upload supported
