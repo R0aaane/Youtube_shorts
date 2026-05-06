@@ -1,12 +1,12 @@
 {
   "video_width": 1080,
   "video_height": 1920,
-  "fps": 60,
+  "fps": 144,
   "duration_seconds": 10,
-  "initial_ball_count": 10,
-  "boss_hp": 10000,
-  "base_damage": 10,
+  "initial_ball_count": 100,
+  "boss_hp": 1000,
+  "base_damage": 40,
   "item_spawn_interval": 75,
-  "random_seed": 1,
+  "random_seed": 1294,
   "output_name": "simulation_001"
 }

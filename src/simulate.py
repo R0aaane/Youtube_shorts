@@ -72,11 +72,15 @@ DEFAULT_CONFIG = {
 
 @dataclass
 class BallState:
+    ball_id: int
     body: pymunk.Body
     damage: int
     hit_cooldown: int = 0
     damage_level: int = 0
     speed_level: int = 0
+    hits: int = 0
+    total_damage_dealt: int = 0
+    max_hit_damage: int = 0
 
 
 @dataclass
@@ -136,7 +140,7 @@ def add_walls(space: pymunk.Space) -> None:
     space.add(*walls)
 
 
-def add_ball(space: pymunk.Space, rng: random.Random, damage: int) -> BallState:
+def add_ball(space: pymunk.Space, rng: random.Random, damage: int, ball_id: int) -> BallState:
     mass = 1.0
     moment = pymunk.moment_for_circle(mass, 0, BALL_RADIUS)
     body = pymunk.Body(mass, moment)
@@ -153,7 +157,7 @@ def add_ball(space: pymunk.Space, rng: random.Random, damage: int) -> BallState:
     shape.elasticity = 1.0
     shape.friction = 0.0
     space.add(body, shape)
-    return BallState(body=body, damage=damage)
+    return BallState(ball_id=ball_id, body=body, damage=damage)
 
 
 def clear_frames_dir() -> None:
@@ -201,6 +205,9 @@ def handle_boss_collision(
 
     ball.hit_cooldown = HIT_COOLDOWN_FRAMES
     dealt = min(boss_hp, ball.damage)
+    ball.hits += 1
+    ball.total_damage_dealt += dealt
+    ball.max_hit_damage = max(ball.max_hit_damage, dealt)
     return max(0, boss_hp - dealt), total_damage + dealt
 
 
@@ -337,6 +344,55 @@ def draw(
         draw_text(surface, status_font, status, (WIDTH // 2, HEIGHT // 2), color)
 
 
+def find_top_damage_ball(balls: list[BallState]) -> BallState:
+    return max(balls, key=lambda ball: (ball.max_hit_damage, ball.total_damage_dealt, ball.damage, -ball.ball_id))
+
+
+def draw_result_screen(
+    surface: pygame.Surface,
+    status: str,
+    boss_hp: int,
+    boss_max_hp: int,
+    total_damage: int,
+    top_ball: BallState,
+    clear_frame: int | None,
+    fps: int,
+) -> None:
+    headline_font = pygame.font.SysFont("arial", 120, bold=True)
+    label_font = pygame.font.SysFont("arial", 48, bold=True)
+    value_font = pygame.font.SysFont("arial", 42, bold=True)
+    small_font = pygame.font.SysFont("arial", 34, bold=True)
+
+    surface.fill((12, 15, 22))
+    color = (104, 232, 143) if status == CLEAR else (255, 105, 105)
+    pygame.draw.rect(surface, color, pygame.Rect(0, 0, WIDTH, 18))
+    pygame.draw.rect(surface, color, pygame.Rect(0, HEIGHT - 18, WIDTH, 18))
+
+    draw_text(surface, headline_font, status, (WIDTH // 2, round(HEIGHT * 0.22)), color)
+
+    if status == CLEAR and clear_frame is not None:
+        clear_seconds = clear_frame / fps
+        result_line = f"Clear Time  {clear_seconds:.2f}s"
+    else:
+        result_line = f"Remaining HP  {boss_hp}/{boss_max_hp}"
+
+    rows = [
+        result_line,
+        f"Total Damage  {total_damage}",
+        f"Top Ball  #{top_ball.ball_id:02d}",
+        f"Max Hit  {top_ball.max_hit_damage}",
+        f"Hits / Damage  {top_ball.hits} / {top_ball.total_damage_dealt}",
+    ]
+
+    start_y = round(HEIGHT * 0.38)
+    row_gap = round(HEIGHT * 0.075)
+    for index, row in enumerate(rows):
+        font = label_font if index == 0 else value_font
+        draw_text(surface, font, row, (WIDTH // 2, start_y + index * row_gap), (238, 244, 250))
+
+    draw_text(surface, small_font, "Evolving Balls vs HP Boss", (WIDTH // 2, round(HEIGHT * 0.86)), (160, 174, 190))
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render a minimal 2D ball simulation.")
     parser.add_argument("--config", type=Path, help="Path to a simulation JSON config.")
@@ -396,7 +452,7 @@ def run(
     space = pymunk.Space()
     space.gravity = 0, 0
     add_walls(space)
-    balls = [add_ball(space, rng, damage) for _ in range(ball_count)]
+    balls = [add_ball(space, rng, damage, ball_id=index + 1) for index in range(ball_count)]
     items: list[Item] = []
     effects: list[Effect] = []
     boss_hp = boss_max_hp
@@ -406,6 +462,10 @@ def run(
     damage_up_count = 0
     speed_up_count = 0
     item_spawn_count = 0
+    result_frame_count = min(fps * 3, max(1, frame_count // 2))
+    simulation_frame_limit = frame_count - result_frame_count
+    clear_frame = None
+    result_started_frame = None
 
     for frame_index in range(1, frame_count + 1):
         for event in pygame.event.get():
@@ -421,30 +481,52 @@ def run(
                 write_result(result)
                 return result
 
-        if frame_index >= ITEM_START_FRAME and (frame_index - ITEM_START_FRAME) % item_spawn_interval == 0:
-            if len(items) < MAX_ITEMS:
-                items.append(spawn_item(rng, balls, item_spawn_count))
-                item_spawn_count += 1
+        if status is None and frame_index > simulation_frame_limit:
+            status = FAILED
 
-        for ball in balls:
-            boss_hp, total_damage = handle_boss_collision(ball, boss_hp, total_damage)
-            limit_ball_speed(ball)
+        if status is None:
+            if frame_index >= ITEM_START_FRAME and (frame_index - ITEM_START_FRAME) % item_spawn_interval == 0:
+                if len(items) < MAX_ITEMS:
+                    items.append(spawn_item(rng, balls, item_spawn_count))
+                    item_spawn_count += 1
 
-        if boss_hp <= 0:
-            status = CLEAR
+            for ball in balls:
+                boss_hp, total_damage = handle_boss_collision(ball, boss_hp, total_damage)
+                limit_ball_speed(ball)
 
-        draw(render_surface, balls, items, effects, boss_hp, boss_max_hp, status)
+            if boss_hp <= 0:
+                status = CLEAR
+                clear_frame = frame_index
+
+            draw(render_surface, balls, items, effects, boss_hp, boss_max_hp, status)
+
+            for effect in effects:
+                effect.frames_left -= 1
+            effects = [effect for effect in effects if effect.frames_left > 0]
+
+            gained_damage_up, gained_speed_up = handle_item_collisions(balls, items, effects)
+            damage_up_count += gained_damage_up
+            speed_up_count += gained_speed_up
+
+            if status is None:
+                space.step(1 / fps)
+        else:
+            if result_started_frame is None:
+                result_started_frame = frame_index
+            draw_result_screen(
+                render_surface,
+                status,
+                boss_hp,
+                boss_max_hp,
+                total_damage,
+                find_top_damage_ball(balls),
+                clear_frame,
+                fps,
+            )
+
         frame_path = FRAMES_DIR / f"frame_{frame_index:06d}.png"
         pygame.image.save(render_surface, str(frame_path))
         frames_rendered = frame_index
-
-        for effect in effects:
-            effect.frames_left -= 1
-        effects = [effect for effect in effects if effect.frames_left > 0]
-
-        gained_damage_up, gained_speed_up = handle_item_collisions(balls, items, effects)
-        damage_up_count += gained_damage_up
-        speed_up_count += gained_speed_up
 
         if preview_screen is not None:
             scaled_surface = pygame.transform.smoothscale(render_surface, preview_screen.get_size())
@@ -452,18 +534,28 @@ def run(
             pygame.display.flip()
             clock.tick(fps)
 
-        if status == CLEAR:
-            break
-
-        space.step(1 / fps)
+        if status == CLEAR and result_started_frame is not None:
+            if frame_index - result_started_frame + 1 >= result_frame_count:
+                break
 
     if status is None:
         status = FAILED
-        draw(render_surface, balls, items, effects, boss_hp, boss_max_hp, status)
+        result_started_frame = frames_rendered
+        draw_result_screen(
+            render_surface,
+            status,
+            boss_hp,
+            boss_max_hp,
+            total_damage,
+            find_top_damage_ball(balls),
+            clear_frame,
+            fps,
+        )
         frame_path = FRAMES_DIR / f"frame_{frames_rendered:06d}.png"
         pygame.image.save(render_surface, str(frame_path))
 
     pygame.quit()
+    top_ball = find_top_damage_ball(balls)
     result = {
         "status": status,
         "boss_hp_start": boss_max_hp,
@@ -473,9 +565,22 @@ def run(
         "total_damage": total_damage,
         "damage_up_collected": damage_up_count,
         "speed_up_collected": speed_up_count,
-        "max_ball_damage": max(ball.damage for ball in balls),
+        "max_ball_damage": top_ball.max_hit_damage,
+        "top_ball": {
+            "id": top_ball.ball_id,
+            "damage": top_ball.damage,
+            "max_hit_damage": top_ball.max_hit_damage,
+            "hits": top_ball.hits,
+            "total_damage_dealt": top_ball.total_damage_dealt,
+            "damage_level": top_ball.damage_level,
+            "speed_level": top_ball.speed_level,
+        },
         "max_speed_level": max(ball.speed_level for ball in balls),
         "frames_rendered": frames_rendered,
+        "result_started_frame": result_started_frame,
+        "result_frames": frames_rendered - result_started_frame + 1 if result_started_frame is not None else 0,
+        "clear_frame": clear_frame,
+        "clear_time_seconds": round(clear_frame / fps, 3) if clear_frame is not None else None,
         "fps": fps,
         "video_width": WIDTH,
         "video_height": HEIGHT,

@@ -1,8 +1,8 @@
 # YouTube Shorts 2D Simulation MVP
 
-1080x1920 の縦長画面で、複数のボールが壁に反射しながら HP ボスを攻撃する 2D 物理シミュレーションです。
+This project generates a vertical 2D physics simulation for YouTube Shorts. Multiple balls bounce in a 1080x1920 arena, collect upgrade items, and attack an HP boss.
 
-## セットアップ
+## Setup
 
 ```powershell
 python -m venv .venv
@@ -10,9 +10,9 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-## JSON設定ファイル
+## JSON Config
 
-標準設定は `configs/boss_battle_001.json` です。
+The default config is `configs/boss_battle_001.json`.
 
 ```json
 {
@@ -29,66 +29,81 @@ pip install -r requirements.txt
 }
 ```
 
-JSONを書き換えるだけで、ボール数、ボスHP、ダメージ、アイテム出現間隔、乱数シード、動画名を変更できます。同じ `random_seed` なら同じ結果になりやすくなります。
+Edit this JSON to change the ball count, boss HP, base damage, item interval, random seed, and output video name. Using the same `random_seed` makes results more reproducible.
 
-## フレーム生成
+## Generate Frames
 
 ```powershell
 python src/simulate.py --config configs/boss_battle_001.json --no-window
 ```
 
-`duration_seconds * fps` 枚のPNGが `output/frames/` に保存されます。標準設定では600フレームです。既存のPNGフレームは実行前に削除されます。
+PNG frames are written to `output/frames/` as `frame_000001.png`, `frame_000002.png`, and so on. Existing PNG frames are deleted before each run.
 
-CLIで一部だけ上書きすることもできます。
+CLI options can override selected config values:
 
 ```powershell
 python src/simulate.py --config configs/boss_battle_001.json --no-window --balls 20 --boss-hp 20000
 ```
 
-## 画面表示ありで確認
+## Preview Window
 
 ```powershell
 python src/simulate.py --config configs/boss_battle_001.json --window
 ```
 
-ウィンドウ表示時は、生成フレームを画面に収まるよう縮小表示します。保存されるPNGは設定ファイルの解像度のままです。
+The preview window is scaled down to fit on screen. Saved PNG frames keep the configured resolution.
 
-## MP4動画生成
+## Result Screen
 
-動画生成には FFmpeg が必要です。`ffmpeg` コマンドが PATH から実行できる状態にしてください。
+The generated frame sequence ends with a 3-second result screen.
+
+It shows:
+
+- `CLEAR` or `FAILED`
+- Clear time for `CLEAR`
+- Remaining HP for `FAILED`
+- Total damage
+- The top damage ball ID, max hit damage, hit count, and total damage dealt
+
+If the boss is defeated early, the simulation writes 3 seconds of result frames and then exits. If the boss survives, the final 3 seconds of the configured duration are reserved for the result screen.
+
+## Generate MP4
+
+FFmpeg is required. Make sure `ffmpeg` is available from PATH.
 
 ```powershell
 ffmpeg -version
 ```
 
-フレーム生成後、次のコマンドでMP4を作成します。
+After generating frames:
 
 ```powershell
 python src/make_video.py --config configs/boss_battle_001.json
 ```
 
-入力:
+Input:
 
 ```text
 output/frames/frame_%06d.png
 ```
 
-出力:
+Output:
 
 ```text
 output/videos/<output_name>.mp4
 ```
 
-標準設定では `output/videos/simulation_001.mp4` が生成されます。動画は設定ファイルの `fps` と解像度を使い、H.264、`yuv420p`、faststart 付きのMP4として生成されます。
+The MP4 uses the configured FPS and resolution, H.264, `yuv420p`, and faststart.
 
-## 現在の範囲
+## Current Scope
 
-- 物理エンジン: pymunk
-- 描画: pygame-ce
-- 重力: なし
-- ボスHPとHPバー表示
-- 複数ボール
-- アイテム: `damage_up`, `speed_up`
-- フレーム出力: `output/frames/`
-- 動画出力: `output/videos/<output_name>.mp4`
-- YouTubeアップロード: 未実装
+- Physics: pymunk
+- Rendering: pygame-ce
+- Gravity: none
+- Boss HP and HP bar
+- Multiple balls
+- Items: `damage_up`, `speed_up`
+- Result screen
+- Frame output: `output/frames/`
+- Video output: `output/videos/<output_name>.mp4`
+- YouTube upload: not implemented
