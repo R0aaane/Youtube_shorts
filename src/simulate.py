@@ -31,7 +31,7 @@ BALL_DAMAGE = 10
 BOSS_RECT = pygame.Rect(260, 240, 560, 180)
 HP_BAR_RECT = pygame.Rect(80, 64, 920, 42)
 HIT_COOLDOWN_FRAMES = 5
-ITEM_RADIUS = 28
+ITEM_RADIUS = 34
 ITEM_START_FRAME = 45
 EFFECT_FRAMES = 26
 POPUP_FRAMES = 42
@@ -806,6 +806,10 @@ def duel_ball_by_side(side: str, left: DuelBall, right: DuelBall) -> DuelBall:
     return left if side == "left" else right
 
 
+def duel_arena_rect() -> pygame.Rect:
+    return pygame.Rect(round(WIDTH * 0.13), round(HEIGHT * 0.245), round(WIDTH * 0.74), round(HEIGHT * 0.50))
+
+
 def draw_scaled_food_skin(surface: pygame.Surface, skin: str, position: tuple[int, int], radius: int) -> None:
     x, y = position
     scale = radius / 118
@@ -1080,7 +1084,7 @@ def draw_ingredient_allies(surface: pygame.Surface, allies: list[IngredientAlly]
 
 def draw_duel_background(surface: pygame.Surface) -> pygame.Rect:
     global DUEL_BACKGROUND_CACHE
-    arena_rect = pygame.Rect(round(WIDTH * 0.09), round(HEIGHT * 0.21), round(WIDTH * 0.82), round(HEIGHT * 0.57))
+    arena_rect = duel_arena_rect()
     if DUEL_BACKGROUND_CACHE is not None:
         surface.blit(DUEL_BACKGROUND_CACHE, (0, 0))
         return arena_rect
@@ -1094,9 +1098,9 @@ def draw_duel_background(surface: pygame.Surface) -> pygame.Rect:
     top_font = make_font(66, bold=True)
     vs_font = make_font(88, bold=True, italic=True)
     shade = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-    shade.fill((0, 0, 0, 90))
+    shade.fill((0, 0, 0, 116))
     cached.blit(shade, (0, 0))
-    pygame.draw.rect(cached, (10, 12, 16), arena_rect, border_radius=8)
+    pygame.draw.rect(cached, (5, 7, 11), arena_rect, border_radius=8)
     pygame.draw.rect(cached, (255, 242, 204), arena_rect, width=5, border_radius=8)
     pygame.draw.rect(cached, (159, 210, 255), arena_rect.inflate(-14, -14), width=2, border_radius=8)
     for x in range(arena_rect.left + 80, arena_rect.right, 120):
@@ -1117,28 +1121,42 @@ def draw_duel_hud(surface: pygame.Surface, left: DuelBall, right: DuelBall, fram
     draw_text_with_shadow(surface, hud_font, f"{left.name} HP: {max(0, left.hp)}", (round(WIDTH * 0.25), y), (255, 245, 230))
     draw_text_with_shadow(surface, hud_font, f"{right.name} HP: {max(0, right.hp)}", (round(WIDTH * 0.75), y), (255, 245, 230))
     draw_text_with_shadow(surface, hud_font, "|", (WIDTH // 2, y), (255, 255, 255))
+    bar_width = round(WIDTH * 0.34)
+    bar_height = 18
+    left_bar = pygame.Rect(round(WIDTH * 0.08), y + 34, bar_width, bar_height)
+    right_bar = pygame.Rect(round(WIDTH * 0.58), y + 34, bar_width, bar_height)
+    for rect, ball, color in [(left_bar, left, (255, 205, 67)), (right_bar, right, (255, 95, 76))]:
+        ratio = max(0.0, min(1.0, ball.hp / max(1, ball.max_hp)))
+        pygame.draw.rect(surface, (13, 16, 22), rect.inflate(8, 8), border_radius=8)
+        pygame.draw.rect(surface, (75, 75, 75), rect, border_radius=6)
+        fill_rect = rect.copy()
+        fill_rect.width = round(rect.width * ratio)
+        pygame.draw.rect(surface, color, fill_rect, border_radius=6)
+        pygame.draw.rect(surface, (245, 250, 255), rect, width=2, border_radius=6)
     left_cd = max(0, left.skill_cooldown // 60)
     right_cd = max(0, right.skill_cooldown // 60)
-    draw_text_with_shadow(surface, small_font, f"{left.name}: [{duel_skill_name(left.skin)} {left_cd}]", (round(WIDTH * 0.25), y + 56), (220, 232, 255))
-    draw_text_with_shadow(surface, small_font, f"{right.name}: [{duel_skill_name(right.skin)} {right_cd}]", (round(WIDTH * 0.75), y + 56), (220, 232, 255))
+    draw_text_with_shadow(surface, small_font, f"{left.name}: [{duel_skill_name(left.skin)} {left_cd}]", (round(WIDTH * 0.25), y + 72), (220, 232, 255))
+    draw_text_with_shadow(surface, small_font, f"{right.name}: [{duel_skill_name(right.skin)} {right_cd}]", (round(WIDTH * 0.75), y + 72), (220, 232, 255))
     progress = min(1.0, frame_index / max(1, total_frames))
     pygame.draw.rect(surface, (58, 58, 58), pygame.Rect(68, HEIGHT - 74, WIDTH - 136, 9))
     pygame.draw.rect(surface, (255, 42, 130), pygame.Rect(68, HEIGHT - 74, round((WIDTH - 136) * progress), 9))
 
 
-def draw_duel_intro(surface: pygame.Surface, frame_index: int, intro_frames: int) -> None:
+def draw_duel_intro(surface: pygame.Surface, frame_index: int, ready_frames: int, intro_frames: int) -> None:
     if frame_index > intro_frames:
         return
-    intro_font = make_font(124, bold=True, italic=True)
-    small_font = make_font(42, bold=True)
-    if frame_index <= intro_frames // 2:
+    intro_font = make_font(122, bold=True, italic=True)
+    title_font = make_font(62, bold=True)
+    small_font = make_font(46, bold=True)
+    if frame_index <= ready_frames:
         text = "READY"
         color = (255, 238, 128)
     else:
         text = "FIGHT!"
         color = (105, 225, 255)
     draw_text_with_shadow(surface, intro_font, text, (WIDTH // 2, round(HEIGHT * 0.47)), color)
-    draw_text_with_shadow(surface, small_font, "PIZZA CHEESE  VS  BURGER ALLIES", (WIDTH // 2, round(HEIGHT * 0.55)), (255, 245, 230))
+    draw_text_with_shadow(surface, title_font, "PIZZA vs BURGER", (WIDTH // 2, round(HEIGHT * 0.36)), (255, 245, 230))
+    draw_text_with_shadow(surface, small_font, "WHO WINS?", (WIDTH // 2, round(HEIGHT * 0.56)), (255, 226, 93))
 
 
 def apply_duel_skill(
@@ -1470,7 +1488,8 @@ def run_food_duel(
     ingredient_damage = max(1, config.duel_ingredient_damage)
     cheese_damage = max(1, config.duel_cheese_damage)
     cheese_projectile_speed = max(200, config.duel_cheese_projectile_speed)
-    arena_rect = pygame.Rect(round(WIDTH * 0.09), round(HEIGHT * 0.21), round(WIDTH * 0.82), round(HEIGHT * 0.57))
+    arena_rect = duel_arena_rect()
+    center = pygame.Vector2(arena_rect.center)
     left_style = FOOD_BALL_STYLES.get(config.duel_left_food, FOOD_BALL_STYLES["pizza"])
     right_style = FOOD_BALL_STYLES.get(config.duel_right_food, FOOD_BALL_STYLES["burger"])
     left = DuelBall(
@@ -1479,8 +1498,8 @@ def run_food_duel(
         color=left_style["color"],
         hp=config.duel_left_hp,
         max_hp=config.duel_left_hp,
-        position=pygame.Vector2(arena_rect.left + radius + 70, arena_rect.centery - 110),
-        velocity=pygame.Vector2(520, 420) * speed_scale,
+        position=center + pygame.Vector2(-radius * 1.65, -radius * 0.38),
+        velocity=pygame.Vector2(760, 220) * speed_scale,
         radius=radius,
     )
     right = DuelBall(
@@ -1489,8 +1508,8 @@ def run_food_duel(
         color=right_style["color"],
         hp=config.duel_right_hp,
         max_hp=config.duel_right_hp,
-        position=pygame.Vector2(arena_rect.right - radius - 70, arena_rect.centery + 110),
-        velocity=pygame.Vector2(-620, -360) * speed_scale,
+        position=center + pygame.Vector2(radius * 1.65, radius * 0.38),
+        velocity=pygame.Vector2(-820, -180) * speed_scale,
         radius=radius,
     )
     popups: list[DamagePopup] = []
@@ -1498,8 +1517,9 @@ def run_food_duel(
     cheese_projectiles: list[CheeseProjectile] = []
     cheese_patches: list[CheesePatch] = []
     ingredient_allies: list[IngredientAlly] = []
-    audio_events: list[AudioEvent] = [AudioEvent(1, "ready"), AudioEvent(46, "fight")]
-    intro_frames = 90
+    ready_frames = max(18, round(fps * 0.38))
+    intro_frames = max(36, round(fps * 0.72))
+    audio_events: list[AudioEvent] = [AudioEvent(1, "ready"), AudioEvent(ready_frames + 1, "fight")]
     result_frame_count = min(fps * 3, max(1, frame_count // 2))
     simulation_frame_limit = frame_count - result_frame_count
     winner: DuelBall | None = None
@@ -1606,7 +1626,7 @@ def run_food_duel(
                 draw_ingredient_allies(render_surface, ingredient_allies)
                 draw_duel_ball(render_surface, left, ball_font)
                 draw_duel_ball(render_surface, right, ball_font)
-                draw_duel_intro(render_surface, frame_index, intro_frames)
+                draw_duel_intro(render_surface, frame_index, ready_frames, intro_frames)
 
                 for popup in popups:
                     progress = 1 - (popup.frames_left / POPUP_FRAMES)

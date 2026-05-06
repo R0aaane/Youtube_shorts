@@ -26,7 +26,7 @@ def test_food_duel_config_uses_large_versus_balls() -> None:
 
     assert config.theme == "food_duel"
     assert config.initial_ball_count == 2
-    assert config.duel_ball_radius >= 70
+    assert config.duel_ball_radius >= 110
     assert config.duration_seconds >= 20
     assert config.duel_speed_scale < 1.0
     assert config.duel_burger_charge_hp_cost > 0

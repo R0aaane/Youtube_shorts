@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## 0.10.0 - 2026-05-07
+
+### Added
+
+- Added duel HP bars to make the battle state easier to read on smartphones.
+
+### Changed
+
+- Increased the default Pizza vs Burger character size for Shorts visibility.
+- Narrowed the food duel arena and adjusted starting positions and velocities so early collisions happen near the center.
+- Shortened the food duel READY/FIGHT intro so skills and damage appear in the opening second.
+- Darkened the duel arena overlay for stronger contrast against food sprites and effects.
+- Updated food duel documentation for the Shorts retention tuning.
+
 ## 0.9.0 - 2026-05-06
 
 ### Added
