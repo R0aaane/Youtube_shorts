@@ -32,8 +32,9 @@ def test_food_duel_config_uses_clear_versus_balls() -> None:
     assert config.duel_burger_charge_hp_cost > 0
     assert config.duel_ingredient_damage > 0
     assert config.duel_cheese_damage > 0
-    assert config.duel_left_food == "pizza"
-    assert config.duel_right_food in {"burger", "sushi"}
+    assert config.duel_left_food in {"pizza", "burger", "sushi", "ice_cream"}
+    assert config.duel_right_food in {"pizza", "burger", "sushi", "ice_cream"}
+    assert config.duel_left_food != config.duel_right_food
 
 
 def test_food_duel_realistic_sprites_exist() -> None:
@@ -42,6 +43,7 @@ def test_food_duel_realistic_sprites_exist() -> None:
     assert Path("assets/food_sprites/pizza_alpha.png").exists()
     assert Path("assets/food_sprites/burger_alpha.png").exists()
     assert Path("assets/food_sprites/sushi_alpha.png").exists()
+    assert Path("assets/food_sprites/ice_cream_alpha.png").exists()
     assert Path("assets/skill_effects/food_skill_sheet_alpha.png").exists()
     assert Path("assets/food_sprites/kitchen_battle_bg.png").exists()
     assert Path("assets/food_sprites/kitchen_battle_bg_optimized.png").exists()

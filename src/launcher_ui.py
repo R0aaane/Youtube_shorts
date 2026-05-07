@@ -13,7 +13,7 @@ from tkinter import messagebox, ttk
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = PROJECT_ROOT / "configs" / "food_duel.json"
 DEFAULT_METADATA = PROJECT_ROOT / "output" / "metadata" / "food_duel.json"
-FOOD_OPTIONS = ("pizza", "burger", "sushi")
+FOOD_OPTIONS = ("pizza", "burger", "sushi", "ice_cream")
 NUMERIC_FIELDS = {
     "duel_left_hp": int,
     "duel_right_hp": int,

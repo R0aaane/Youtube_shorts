@@ -146,6 +146,9 @@ def load_result() -> dict:
 
 
 def build_title(config: dict, result: dict) -> str:
+    def display_food(value: str) -> str:
+        return value.replace("_", " ").title()
+
     if config.get("theme") == "fibonacci_vs_exponential":
         return "100 Fibonacci VS Exponential Balls"
 
@@ -161,8 +164,10 @@ def build_title(config: dict, result: dict) -> str:
 
     if config.get("theme") == "food_duel":
         winner = result.get("winner")
-        left = str(config.get("duel_left_food", "pizza")).title()
-        right = str(config.get("duel_right_food", "burger")).title()
+        left = display_food(str(config.get("duel_left_food", "pizza")))
+        right = display_food(str(config.get("duel_right_food", "burger")))
+        if result.get("tie"):
+            return f"{left} VS {right}: Unbelievable Tie in the Food Skill Battle"
         if winner:
             return f"{left} VS {right}: {winner} Wins the Food Skill Battle"
         return f"{left} VS {right}: Food Skill Battle"

@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## 0.21.1 - 2026-05-08
+
+### Changed
+
+- Replaced the Ice Cream cone sprite with a more circular cup-style ice cream sprite so it fits the duel collision body better.
+
+### Fixed
+
+- Added a dedicated Food Duel tie result for simultaneous 0 HP endings, showing `UNBELIEVABLE TIE!`, `NO WINNER`, and `DRAW` instead of assigning a winner.
+- Updated Food Duel metadata titles to describe tied duel results without naming a winner.
+
+## 0.21.0 - 2026-05-08
+
+### Added
+
+- Added ICE CREAM as a Food Duel character with a generated realistic cone sprite.
+- Added Ice Cream skills: `FREEZE SHOT`, `COLD DASH`, and `SWEET HEAL`.
+- Added Ice Cream to the launcher matchup selector and default Food Duel config.
+
+### Fixed
+
+- Fixed Burger ingredient allies targeting the left-side character unconditionally, which could make Burger hit itself when Burger was on the left.
+- Fixed Food Duel metadata titles so underscore food ids such as `ice_cream` render as readable names.
+
 ## 0.20.4 - 2026-05-08
 
 ### Changed

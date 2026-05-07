@@ -261,6 +261,7 @@ class SushiProjectile:
     velocity: pygame.Vector2
     radius: int = 17
     frames_left: int = 120
+    owner_skin: str = "sushi"
 
 
 @dataclass
@@ -402,6 +403,7 @@ FOOD_BALL_STYLES = {
     "pizza": {"label": "PIZ", "color": (255, 202, 77)},
     "burger": {"label": "BRG", "color": (188, 118, 60)},
     "sushi": {"label": "SUS", "color": (246, 246, 238)},
+    "ice_cream": {"label": "ICE", "color": (178, 232, 255)},
     "taco": {"label": "TAC", "color": (244, 187, 66)},
     "donut": {"label": "DON", "color": (229, 133, 181)},
     "fries": {"label": "FRY", "color": (247, 205, 75)},
@@ -862,6 +864,7 @@ def food_label(food: str) -> str:
         "pizza": "PIZZA",
         "burger": "BURGER",
         "sushi": "SUSHI",
+        "ice_cream": "ICE CREAM",
         "taco": "TACO",
         "donut": "DONUT",
         "fries": "FRIES",
@@ -874,6 +877,7 @@ def duel_skill_name(food: str) -> str:
         "pizza": "CHEESE",
         "burger": "CHARGE+ALLY",
         "sushi": "WASABI+ROLL",
+        "ice_cream": "FREEZE+COLD",
         "taco": "CRIT",
         "donut": "SHIELD",
         "fries": "COMBO",
@@ -890,6 +894,8 @@ def duel_attack_color(skin: str) -> tuple[int, int, int]:
         return (255, 215, 70)
     if skin == "sushi":
         return (90, 224, 154)
+    if skin == "ice_cream":
+        return (126, 232, 255)
     return (255, 76, 70)
 
 
@@ -934,6 +940,14 @@ def draw_scaled_food_skin(surface: pygame.Surface, skin: str, position: tuple[in
         pygame.draw.ellipse(surface, (246, 246, 238), rect(-76, -48, 152, 96))
         pygame.draw.ellipse(surface, (235, 92, 84), rect(-66, -34, 132, 68))
         pygame.draw.line(surface, (255, 214, 204), point(-28, -32), point(20, 33), max(7, round(13 * scale)))
+        return
+
+    if skin == "ice_cream":
+        pygame.draw.polygon(surface, (206, 127, 48), [point(-42, 22), point(42, 22), point(0, 98)])
+        pygame.draw.polygon(surface, (139, 79, 34), [point(-42, 22), point(42, 22), point(0, 98)], width=max(4, round(7 * scale)))
+        pygame.draw.circle(surface, (248, 236, 211), point(0, -8), round(47 * scale))
+        pygame.draw.circle(surface, (247, 149, 174), point(0, -58), round(45 * scale))
+        pygame.draw.arc(surface, (130, 224, 255), rect(-70, -78, 140, 128), 0.2, 2.95, max(5, round(9 * scale)))
         return
 
     if skin == "taco":
@@ -1021,13 +1035,14 @@ def load_food_sprite(skin: str, radius: int, missing_stage: int = 0, cheese_stag
             "pizza": FOOD_SPRITES_DIR / "pizza_alpha.png",
             "burger": FOOD_SPRITES_DIR / "burger_alpha.png",
             "sushi": FOOD_SPRITES_DIR / "sushi_alpha.png",
+            "ice_cream": FOOD_SPRITES_DIR / "ice_cream_alpha.png",
         }
         sprite_path = sprite_paths.get(skin)
     if sprite_path is None or not sprite_path.exists():
         return None
 
     keyed = trim_alpha_surface(load_alpha_surface(sprite_path))
-    sprite_size = round(radius * (2.95 if skin == "pizza" else 2.85 if skin == "sushi" else 2.7))
+    sprite_size = round(radius * (3.05 if skin == "ice_cream" else 2.95 if skin == "pizza" else 2.85 if skin == "sushi" else 2.7))
     scaled = pygame.transform.smoothscale(keyed, (sprite_size, sprite_size))
     SPRITE_CACHE[cache_key] = scaled
     return scaled
@@ -1199,7 +1214,7 @@ def draw_duel_ball(surface: pygame.Surface, ball: DuelBall, font: pygame.font.Fo
     if ball.charge_frames > 0:
         pulse = 1 + math.sin(ball.charge_frames * 0.42) * 0.12
         label_font = make_font(round(37 * pulse), bold=True, italic=True)
-        label = "ROLL DASH" if ball.skin == "sushi" else "CHARGE"
+        label = "ROLL DASH" if ball.skin == "sushi" else "COLD DASH" if ball.skin == "ice_cream" else "CHARGE"
         draw_text_with_shadow(surface, label_font, label, (position[0], position[1] - ball.radius - 76), duel_attack_color(ball.skin))
     elif ball.burn_frames > 0:
         pulse = 1 + math.sin(ball.burn_frames * 0.38) * 0.1
@@ -1259,7 +1274,10 @@ def should_draw_skill_label(label: str) -> bool:
         "WASABI SHOT",
         "SOY SPLASH",
         "ROLL DASH",
+        "FREEZE SHOT",
+        "COLD DASH",
         "FRESH HEAL",
+        "SWEET HEAL",
         "LETTUCE",
         "CHEESE",
         "TOMATO",
@@ -1375,6 +1393,20 @@ def draw_duel_effects(surface: pygame.Surface, effects: list[DuelEffect]) -> Non
             surface.blit(splash, (0, 0))
             if effect.label and should_draw_skill_label(effect.label):
                 draw_skill_label(surface, effect.label, (center[0], center[1] - radius - 54), effect.color, progress, 36)
+        elif effect.kind == "freeze":
+            frost = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            radius = round(34 + progress * 84)
+            pygame.draw.circle(frost, (126, 232, 255, round(190 * (1 - progress))), center, radius, width=9)
+            pygame.draw.circle(frost, (238, 255, 255, round(155 * (1 - progress))), center, max(14, radius // 2), width=5)
+            for angle in range(0, 360, 30):
+                start = pygame.Vector2(center) + pygame.Vector2(1, 0).rotate(angle) * radius * 0.22
+                end = pygame.Vector2(center) + pygame.Vector2(1, 0).rotate(angle) * radius * (0.75 + (angle % 4) * 0.08)
+                pygame.draw.line(frost, (190, 248, 255, round(180 * (1 - progress))), start, end, max(3, round(7 * (1 - progress))))
+                pygame.draw.circle(frost, (234, 255, 255, round(180 * (1 - progress))), (round(end.x), round(end.y)), max(4, round(8 * (1 - progress))))
+            surface.blit(frost, (0, 0))
+            draw_duel_particles(surface, center, (160, 238, 255), progress, 12, radius * 0.72)
+            if effect.label and should_draw_skill_label(effect.label):
+                draw_skill_label(surface, effect.label, (center[0], center[1] - radius - 58), effect.color, progress, 38)
         elif effect.kind == "heal":
             heal = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             radius = round(34 + progress * 74)
@@ -1445,7 +1477,18 @@ def draw_sushi_projectiles(surface: pygame.Surface, projectiles: list[SushiProje
         center = (round(projectile.position.x), round(projectile.position.y))
         layer = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
         direction = projectile.velocity.normalize() if projectile.velocity.length_squared() > 0 else pygame.Vector2(1, 0)
-        if projectile.kind == "soy":
+        if projectile.kind == "freeze":
+            for index in range(8):
+                tail = pygame.Vector2(center) - direction.rotate((index - 3.5) * 7) * projectile.radius * (0.9 + index * 0.28)
+                pygame.draw.circle(layer, (145, 236, 255, max(48, 170 - index * 14)), (round(tail.x), round(tail.y)), max(4, projectile.radius // 4))
+            points = []
+            for angle in [0, 55, 115, 180, 245, 305]:
+                offset = pygame.Vector2(1, 0).rotate(angle + projectile.frames_left * 2) * projectile.radius * 0.92
+                points.append((round(center[0] + offset.x), round(center[1] + offset.y)))
+            pygame.draw.polygon(layer, (122, 226, 255, 232), points)
+            pygame.draw.circle(layer, (238, 255, 255, 230), center, round(projectile.radius * 0.58))
+            pygame.draw.polygon(layer, (238, 255, 255, 168), points, width=3)
+        elif projectile.kind == "soy":
             for index in range(10):
                 tail = pygame.Vector2(center) - direction.rotate((index - 4.5) * 8) * projectile.radius * (0.82 + index * 0.3)
                 pygame.draw.circle(layer, (124, 72, 38, max(42, 158 - index * 12)), (round(tail.x), round(tail.y)), max(6, round(projectile.radius * 0.42)))
@@ -1470,7 +1513,8 @@ def draw_sushi_projectiles(surface: pygame.Surface, projectiles: list[SushiProje
             sprite = load_skill_effect_sprite("wasabi", projectile.radius * 3)
             if sprite is not None:
                 blit_center(layer, sprite, center, 190)
-        pygame.draw.circle(layer, (238, 255, 232, 150), center, projectile.radius + 3, width=2)
+        outline_color = (232, 255, 255, 170) if projectile.owner_skin == "ice_cream" else (238, 255, 232, 150)
+        pygame.draw.circle(layer, outline_color, center, projectile.radius + 3, width=2)
         surface.blit(layer, (0, 0))
 
 
@@ -1668,6 +1712,11 @@ def apply_duel_skill(
         damage += 40
         effects.append(DuelEffect("charge", defender.position.copy(), 30, duel_attack_color("sushi"), "ROLL DASH"))
         audio_events.append(AudioEvent(frame_index, "charge_hit"))
+    elif attacker.skin == "ice_cream" and attacker.charge_frames > 0:
+        damage += 34
+        defender.slow_frames = max(defender.slow_frames, 70)
+        effects.append(DuelEffect("freeze", defender.position.copy(), 32, duel_attack_color("ice_cream"), "COLD DASH"))
+        audio_events.append(AudioEvent(frame_index, "charge_hit"))
     elif attacker.skin == "taco" and rng.random() < 0.35:
         damage *= 2
     elif attacker.skin == "donut":
@@ -1770,7 +1819,7 @@ def update_duel_ball(
             speed = 700 if skill == "wasabi" else 620
             start = ball.position + direction * (ball.radius + 20)
             sushi_projectiles.append(
-                SushiProjectile(kind=skill, position=start, velocity=direction * speed, radius=18 if skill == "wasabi" else 20)
+                SushiProjectile(kind=skill, position=start, velocity=direction * speed, radius=18 if skill == "wasabi" else 20, owner_skin="sushi")
             )
             effects.append(
                 DuelEffect(
@@ -1783,6 +1832,34 @@ def update_duel_ball(
             )
             audio_events.append(AudioEvent(frame_index, "sushi_shot" if skill == "wasabi" else "soy_splash"))
         ball.skill_cooldown = 78
+    elif ball.skin == "ice_cream" and ball.skill_cooldown == 0:
+        direction = target.position - ball.position
+        if direction.length_squared() == 0:
+            direction = pygame.Vector2(1, 0)
+        direction = direction.normalize()
+        skill = ["freeze", "dash", "heal"][ball.sushi_skill_index % 3]
+        ball.sushi_skill_index += 1
+        if skill == "dash":
+            ball.velocity = direction * max(charge_speed * 0.86, 540)
+            ball.charge_frames = 32
+            effects.append(DuelEffect("freeze", ball.position.copy(), 28, duel_attack_color("ice_cream"), "COLD DASH"))
+            audio_events.append(AudioEvent(frame_index, "roll_start"))
+        elif skill == "heal":
+            healed = min(26, ball.max_hp - ball.hp)
+            if healed > 0:
+                ball.hp += healed
+                effects.append(DuelEffect("heal", ball.position.copy(), 42, duel_attack_color("ice_cream"), f"+{healed} SWEET HEAL"))
+                audio_events.append(AudioEvent(frame_index, "heal"))
+            else:
+                ball.velocity.rotate_ip(rng.uniform(-26, 26))
+        else:
+            start = ball.position + direction * (ball.radius + 20)
+            sushi_projectiles.append(
+                SushiProjectile(kind="freeze", position=start, velocity=direction * 660, radius=19, owner_skin="ice_cream")
+            )
+            effects.append(DuelEffect("freeze", start.copy(), 30, duel_attack_color("ice_cream"), "FREEZE SHOT"))
+            audio_events.append(AudioEvent(frame_index, "sushi_shot"))
+        ball.skill_cooldown = 82
     elif ball.skill_cooldown == 0 and ball.skin != "pizza":
         ball.velocity.rotate_ip(rng.uniform(-22, 22))
         ball.skill_cooldown = 120
@@ -1953,6 +2030,11 @@ def update_sushi_projectiles(
                 target.slow_frames = max(target.slow_frames, 90)
                 effects.append(DuelEffect("soy", projectile.position.copy(), 36, (156, 96, 54), "SOY SPLASH"))
                 audio_events.append(AudioEvent(frame_index, "soy_splash"))
+            elif projectile.kind == "freeze":
+                dealt = min(target.hp, 14)
+                target.slow_frames = max(target.slow_frames, 110)
+                effects.append(DuelEffect("freeze", projectile.position.copy(), 38, duel_attack_color("ice_cream"), "FREEZE SHOT"))
+                audio_events.append(AudioEvent(frame_index, "sushi_hit"))
             else:
                 dealt = min(target.hp, 12)
                 target.wasabi_frames = max(target.wasabi_frames, 120)
@@ -1962,9 +2044,9 @@ def update_sushi_projectiles(
             final_hit = dealt >= target.hp
             target.hp -= dealt
             total_damage += dealt
-            popups.append(make_damage_popup(dealt, target.position.copy(), duel_attack_color("sushi")))
+            popups.append(make_damage_popup(dealt, target.position.copy(), duel_attack_color(projectile.owner_skin)))
             if final_hit:
-                effects.append(DuelEffect("impact", target.position.copy(), 40, duel_attack_color("sushi"), "FINAL HIT!"))
+                effects.append(DuelEffect("impact", target.position.copy(), 40, duel_attack_color(projectile.owner_skin), "FINAL HIT!"))
             continue
         if projectile.frames_left > 0:
             remaining.append(projectile)
@@ -2109,11 +2191,13 @@ def handle_duel_collision(
 
 def draw_duel_result(
     surface: pygame.Surface,
-    winner: DuelBall,
+    winner: DuelBall | None,
     loser: DuelBall,
     frame_index: int,
     fps: int,
     result_started_frame: int | None = None,
+    tie: bool = False,
+    tie_other: DuelBall | None = None,
 ) -> None:
     draw_duel_background(surface)
     progress = 1.0
@@ -2127,25 +2211,44 @@ def draw_duel_result(
 
     focus = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
     focus_center = (WIDTH // 2, round(HEIGHT * 0.48))
-    spotlight_radius = round(winner.radius * (2.4 + ease * 1.4))
-    pygame.draw.circle(focus, (*duel_attack_color(winner.skin), 54), focus_center, spotlight_radius)
+    focus_food = winner or loser
+    spotlight_radius = round(focus_food.radius * (2.4 + ease * 1.4))
+    spotlight_color = (255, 245, 230) if tie else duel_attack_color(focus_food.skin)
+    pygame.draw.circle(focus, (*spotlight_color, 54), focus_center, spotlight_radius)
     pygame.draw.circle(focus, (255, 255, 255, 210), focus_center, round(spotlight_radius * 0.72), width=6)
     surface.blit(focus, (0, 0))
 
-    focus_ball = DuelBall(
-        name=winner.name,
-        skin=winner.skin,
-        color=winner.color,
-        hp=winner.hp,
-        max_hp=winner.max_hp,
-        position=pygame.Vector2(focus_center),
-        velocity=pygame.Vector2(0, 0),
-        radius=round(winner.radius * (1.3 + ease * 0.62)),
-        total_damage_dealt=winner.total_damage_dealt,
-        hits=winner.hits,
-        visual_angle=winner.visual_angle + progress * 10,
-    )
-    draw_duel_ball(surface, focus_ball, make_font(max(58, round(focus_ball.radius * 0.38)), bold=True))
+    if tie and tie_other is not None:
+        for offset_x, ball in [(-round(focus_food.radius * 0.92), loser), (round(focus_food.radius * 0.92), tie_other)]:
+            focus_ball = DuelBall(
+                name=ball.name,
+                skin=ball.skin,
+                color=ball.color,
+                hp=ball.hp,
+                max_hp=ball.max_hp,
+                position=pygame.Vector2(focus_center[0] + offset_x, focus_center[1]),
+                velocity=pygame.Vector2(0, 0),
+                radius=round(ball.radius * (1.0 + ease * 0.35)),
+                total_damage_dealt=ball.total_damage_dealt,
+                hits=ball.hits,
+                visual_angle=ball.visual_angle + progress * 8,
+            )
+            draw_duel_ball(surface, focus_ball, make_font(max(48, round(focus_ball.radius * 0.34)), bold=True))
+    else:
+        focus_ball = DuelBall(
+            name=focus_food.name,
+            skin=focus_food.skin,
+            color=focus_food.color,
+            hp=focus_food.hp,
+            max_hp=focus_food.max_hp,
+            position=pygame.Vector2(focus_center),
+            velocity=pygame.Vector2(0, 0),
+            radius=round(focus_food.radius * (1.3 + ease * 0.62)),
+            total_damage_dealt=focus_food.total_damage_dealt,
+            hits=focus_food.hits,
+            visual_angle=focus_food.visual_angle + progress * 10,
+        )
+        draw_duel_ball(surface, focus_ball, make_font(max(58, round(focus_ball.radius * 0.38)), bold=True))
 
     headline_font = make_font(118, bold=True, italic=True)
     result_font = make_font(50, bold=True)
@@ -2159,16 +2262,24 @@ def draw_duel_result(
             (255, 245, 230),
         )
     else:
-        draw_text_with_shadow(surface, headline_font, f"{winner.name} WINS!", (WIDTH // 2, round(HEIGHT * 0.24)), duel_attack_color(winner.skin))
-    draw_text_with_shadow(surface, result_font, "THIS FOOD WINS", (WIDTH // 2, round(HEIGHT * 0.68)), (255, 245, 230))
-    draw_text_with_shadow(surface, result_font, f"Damage {winner.total_damage_dealt}  Hits {winner.hits}", (WIDTH // 2, round(HEIGHT * 0.74)), (220, 232, 255))
-    draw_text_with_shadow(
-        surface,
-        make_font(40, bold=True),
-        f"{loser.name} HP {max(0, loser.hp)}",
-        (WIDTH // 2, round(HEIGHT * 0.80)),
-        duel_attack_color(loser.skin),
-    )
+        if tie:
+            draw_text_with_shadow(surface, make_font(90, bold=True, italic=True), "UNBELIEVABLE TIE!", (WIDTH // 2, round(HEIGHT * 0.24)), (255, 245, 230))
+        else:
+            draw_text_with_shadow(surface, headline_font, f"{focus_food.name} WINS!", (WIDTH // 2, round(HEIGHT * 0.24)), duel_attack_color(focus_food.skin))
+    if tie and tie_other is not None:
+        draw_text_with_shadow(surface, result_font, "NO WINNER", (WIDTH // 2, round(HEIGHT * 0.68)), (255, 245, 230))
+        draw_text_with_shadow(surface, make_font(46, bold=True), "DRAW", (WIDTH // 2, round(HEIGHT * 0.74)), (220, 232, 255))
+        draw_text_with_shadow(surface, make_font(38, bold=True), f"{loser.name} HP 0   {tie_other.name} HP 0", (WIDTH // 2, round(HEIGHT * 0.80)), (255, 228, 190))
+    else:
+        draw_text_with_shadow(surface, result_font, "THIS FOOD WINS", (WIDTH // 2, round(HEIGHT * 0.68)), (255, 245, 230))
+        draw_text_with_shadow(surface, result_font, f"Damage {focus_food.total_damage_dealt}  Hits {focus_food.hits}", (WIDTH // 2, round(HEIGHT * 0.74)), (220, 232, 255))
+        draw_text_with_shadow(
+            surface,
+            make_font(40, bold=True),
+            f"{loser.name} HP {max(0, loser.hp)}",
+            (WIDTH // 2, round(HEIGHT * 0.80)),
+            duel_attack_color(loser.skin),
+        )
 
 
 def run_food_duel(
@@ -2234,6 +2345,7 @@ def run_food_duel(
     result_frame_count = fps * 2
     winner: DuelBall | None = None
     loser: DuelBall | None = None
+    tie = False
     result_started_frame: int | None = None
     frames_rendered = 0
     hit_stop_frames = 0
@@ -2250,9 +2362,9 @@ def run_food_duel(
                 write_result(result)
                 return result
 
-        if winner is None:
+        if winner is None and not tie:
             arena_rect = draw_duel_background(render_surface)
-            if winner is None and frame_index > intro_frames:
+            if winner is None and not tie and frame_index > intro_frames:
                 if hit_stop_frames <= 0:
                     update_duel_ball(
                         left,
@@ -2305,20 +2417,25 @@ def run_food_duel(
                     )
                     if cheese_damage_done > 0:
                         left.total_damage_dealt += cheese_damage_done
-                    sushi_damage_done = 0
-                    if left.skin == "sushi":
-                        sushi_damage_done += update_sushi_projectiles(sushi_projectiles, right, popups, duel_effects, audio_events, frame_index)
-                        sushi_damage_done += apply_wasabi(right, popups, duel_effects, audio_events, frame_index)
-                        if sushi_damage_done > 0:
-                            left.total_damage_dealt += sushi_damage_done
-                    elif right.skin == "sushi":
-                        sushi_damage_done += update_sushi_projectiles(sushi_projectiles, left, popups, duel_effects, audio_events, frame_index)
-                        sushi_damage_done += apply_wasabi(left, popups, duel_effects, audio_events, frame_index)
-                        if sushi_damage_done > 0:
-                            right.total_damage_dealt += sushi_damage_done
+                    skill_damage_done = 0
+                    skill_attacker: DuelBall | None = None
+                    if left.skin in {"sushi", "ice_cream"}:
+                        skill_damage_done += update_sushi_projectiles(sushi_projectiles, right, popups, duel_effects, audio_events, frame_index)
+                        if left.skin == "sushi":
+                            skill_damage_done += apply_wasabi(right, popups, duel_effects, audio_events, frame_index)
+                        skill_attacker = left
+                    elif right.skin in {"sushi", "ice_cream"}:
+                        skill_damage_done += update_sushi_projectiles(sushi_projectiles, left, popups, duel_effects, audio_events, frame_index)
+                        if right.skin == "sushi":
+                            skill_damage_done += apply_wasabi(left, popups, duel_effects, audio_events, frame_index)
+                        skill_attacker = right
+                    if skill_damage_done > 0 and skill_attacker is not None:
+                        skill_attacker.total_damage_dealt += skill_damage_done
+                    ingredient_target = right if left.skin == "burger" else left
+                    ingredient_owner = left if left.skin == "burger" else right if right.skin == "burger" else None
                     ally_damage = update_ingredient_allies(
                         ingredient_allies,
-                        left,
+                        ingredient_target,
                         arena_rect,
                         popups,
                         duel_effects,
@@ -2326,8 +2443,8 @@ def run_food_duel(
                         frame_index,
                     )
                     hit_landed, burger_charge_hit, hit_damage = handle_duel_collision(left, right, damage, popups, duel_effects, audio_events, frame_index, rng)
-                    if ally_damage > 0:
-                        right.total_damage_dealt += ally_damage
+                    if ally_damage > 0 and ingredient_owner is not None:
+                        ingredient_owner.total_damage_dealt += ally_damage
                     if burger_charge_hit:
                         hit_stop_frames = 7
                         shake_frames = 16
@@ -2344,13 +2461,18 @@ def run_food_duel(
                 else:
                     hit_stop_frames -= 1
 
-            if winner is None and (left.hp <= 0 or right.hp <= 0):
-                winner, loser = (left, right) if left.hp > right.hp else (right, left)
+            if winner is None and not tie and (left.hp <= 0 or right.hp <= 0):
+                if left.hp <= 0 and right.hp <= 0:
+                    tie = True
+                    winner = None
+                    loser = left
+                else:
+                    winner, loser = (left, right) if left.hp > right.hp else (right, left)
                 result_started_frame = frame_index + 1
                 audio_events.append(AudioEvent(frame_index + 1, "victory"))
 
             ball_font = make_font(max(48, round(radius * 0.43)), bold=True)
-            if winner is None:
+            if winner is None and not tie:
                 draw_duel_effects(render_surface, duel_effects)
                 draw_cheese_projectiles(render_surface, cheese_projectiles)
                 draw_sushi_projectiles(render_surface, sushi_projectiles)
@@ -2379,11 +2501,11 @@ def run_food_duel(
                 duel_effects = [effect for effect in duel_effects if effect.frames_left > 0]
                 draw_duel_hud(render_surface, left, right, frame_index, max(frame_count, frame_index + result_frame_count))
             else:
-                draw_duel_result(render_surface, winner, loser or left, frame_index, fps, result_started_frame)
+                draw_duel_result(render_surface, winner, loser or left, frame_index, fps, result_started_frame, tie, right if tie else None)
         else:
             if result_started_frame is None:
                 result_started_frame = frame_index
-            draw_duel_result(render_surface, winner, loser or left, frame_index, fps, result_started_frame)
+            draw_duel_result(render_surface, winner, loser or left, frame_index, fps, result_started_frame, tie, right if tie else None)
 
         if shake_frames > 0 and winner is None:
             frame_copy = render_surface.copy()
@@ -2404,12 +2526,16 @@ def run_food_duel(
             pygame.display.flip()
             clock.tick(fps)
 
-        if winner is not None and result_started_frame is not None:
+        if (winner is not None or tie) and result_started_frame is not None:
             if frame_index - result_started_frame + 1 >= result_frame_count:
                 break
 
-    if winner is None:
-        winner, loser = (left, right) if left.hp >= right.hp else (right, left)
+    if winner is None and not tie:
+        if left.hp <= 0 and right.hp <= 0:
+            tie = True
+            loser = left
+        else:
+            winner, loser = (left, right) if left.hp >= right.hp else (right, left)
         result_started_frame = frames_rendered
         audio_events.append(AudioEvent(frames_rendered, "victory"))
 
@@ -2417,8 +2543,9 @@ def run_food_duel(
     result = {
         "status": "CLEAR",
         "theme": config.theme,
-        "winner": winner.name,
-        "loser": loser.name if loser is not None else None,
+        "winner": None if tie else winner.name if winner is not None else None,
+        "loser": None if tie else loser.name if loser is not None else None,
+        "tie": tie,
         "left": {
             "name": left.name,
             "food": left.skin,
