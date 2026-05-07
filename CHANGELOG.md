@@ -1,5 +1,46 @@
 # CHANGELOG
 
+## 0.18.0 - 2026-05-08
+
+### Added
+
+- Added a Tkinter launcher UI for preview, full generation, MP4 encoding, upload dry run, and private YouTube upload commands.
+
+### Changed
+
+- Changed food duel rendering so it continues until one side reaches 0 HP instead of ending at the configured 20-second limit.
+- Changed food duel metadata duration to use the actual rendered frame count.
+- Updated food duel documentation for the no-time-limit duel behavior and launcher UI.
+
+## 0.17.3 - 2026-05-07
+
+### Changed
+
+- Changed the default food duel ball radius back to 70.
+- Regenerated READY/FIGHT voice clips with an English voice.
+- Changed regular collision and light-damage sounds so hit types are easier to distinguish.
+- Updated the food duel config test for the smaller readable ball radius.
+
+## 0.17.2 - 2026-05-07
+
+### Added
+
+- Added recorded READY/FIGHT voice WAV assets for the food duel intro.
+
+### Changed
+
+- Changed ball collision audio to use a wet food-bump sound.
+- Changed normal duel collisions so shockwaves are only drawn for strong damage hits.
+- Updated food duel documentation for the revised voice and impact behavior.
+
+## 0.17.1 - 2026-05-07
+
+### Changed
+
+- Changed READY/FIGHT audio to use more voice-like synthesized callouts.
+- Changed cheese stick, Burger charge hit, and ingredient hit sounds to wetter food-impact effects.
+- Updated food duel documentation for the revised synthesized audio cues.
+
 ## 0.17.0 - 2026-05-07
 
 ### Added

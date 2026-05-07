@@ -1578,8 +1578,6 @@ def handle_duel_collision(
     right.position += normal * (overlap / 2)
     left.velocity = left.velocity.reflect(normal)
     right.velocity = right.velocity.reflect(-normal)
-    midpoint = left.position + normal * (min_distance / 2)
-    effects.append(DuelEffect("impact", midpoint, 24, (255, 255, 255)))
     audio_events.append(AudioEvent(frame_index, "impact"))
     hit_landed = False
     burger_charge_hit = False
@@ -1732,8 +1730,7 @@ def run_food_duel(
     ready_frames = max(18, round(fps * 0.38))
     intro_frames = max(36, round(fps * 0.72))
     audio_events: list[AudioEvent] = [AudioEvent(1, "ready"), AudioEvent(ready_frames + 1, "fight")]
-    result_frame_count = min(fps * 3, max(1, frame_count // 2))
-    simulation_frame_limit = frame_count - result_frame_count
+    result_frame_count = fps * 3
     winner: DuelBall | None = None
     loser: DuelBall | None = None
     result_started_frame: int | None = None
@@ -1742,7 +1739,9 @@ def run_food_duel(
     shake_frames = 0
     shake_strength = 0
 
-    for frame_index in range(1, frame_count + 1):
+    frame_index = 0
+    while True:
+        frame_index += 1
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -1752,10 +1751,6 @@ def run_food_duel(
 
         if winner is None:
             arena_rect = draw_duel_background(render_surface)
-            if frame_index > simulation_frame_limit:
-                winner, loser = (left, right) if left.hp >= right.hp else (right, left)
-                result_started_frame = frame_index
-                audio_events.append(AudioEvent(frame_index, "victory"))
             if winner is None and frame_index > intro_frames:
                 if hit_stop_frames <= 0:
                     update_duel_ball(
@@ -1865,7 +1860,7 @@ def run_food_duel(
                 for effect in duel_effects:
                     effect.frames_left -= 1
                 duel_effects = [effect for effect in duel_effects if effect.frames_left > 0]
-                draw_duel_hud(render_surface, left, right, frame_index, frame_count)
+                draw_duel_hud(render_surface, left, right, frame_index, max(frame_count, frame_index + result_frame_count))
             else:
                 draw_duel_result(render_surface, winner, loser or left, frame_index, fps, result_started_frame)
         else:

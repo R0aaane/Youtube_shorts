@@ -243,6 +243,7 @@ def write_youtube_metadata(config: dict, config_path: Path | None, video_path: P
             "math balls",
         ]
 
+    actual_duration = round(result.get("frames_rendered", config["duration_seconds"] * config["fps"]) / max(1, config["fps"]), 3)
     metadata = {
         "title": build_title(config, result),
         "description": description,
@@ -253,7 +254,8 @@ def write_youtube_metadata(config: dict, config_path: Path | None, video_path: P
         else None,
         "config_file": relative_path(config_path) if config_path is not None else None,
         "result": result,
-        "duration_seconds": config["duration_seconds"],
+        "duration_seconds": actual_duration,
+        "configured_duration_seconds": config["duration_seconds"],
         "boss_hp": config["boss_hp"],
         "initial_ball_count": config["initial_ball_count"],
     }

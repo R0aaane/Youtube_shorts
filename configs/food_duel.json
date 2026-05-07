@@ -14,7 +14,7 @@
   "duel_right_food": "burger",
   "duel_left_hp": 700,
   "duel_right_hp": 820,
-  "duel_ball_radius": 112,
+  "duel_ball_radius": 70,
   "duel_speed_scale": 0.55,
   "duel_charge_speed": 680,
   "duel_burger_charge_hp_cost": 40,
