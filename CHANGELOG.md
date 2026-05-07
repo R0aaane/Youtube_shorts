@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 0.20.4 - 2026-05-08
+
+### Changed
+
+- Added minimum and maximum visible speed clamps for food duel characters so slows, bounces, and reload timing do not make late-fight movement stall.
+- Kept the default food duel pacing within the Shorts-friendly 20-30 second range after the movement tempo adjustment.
+
 ## 0.20.3 - 2026-05-08
 
 ### Changed

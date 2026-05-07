@@ -39,6 +39,8 @@ EFFECT_FRAMES = 26
 POPUP_FRAMES = 42
 MAX_ITEMS = 8
 MAX_BALL_SPEED = 1800
+DUEL_MIN_SPEED_PER_FRAME = 5.0
+DUEL_MAX_SPEED_PER_FRAME = 13.0
 CLEAR = "CLEAR"
 FAILED = "FAILED"
 
@@ -224,6 +226,24 @@ def update_food_reload(ball: DuelBall) -> None:
         ball.missing_ingredients.pop()
     elif ball.skin == "pizza" and ball.reload_frames % step == 0 and ball.cheese_spent > 0:
         ball.cheese_spent -= 1
+
+
+def clamp_duel_velocity(ball: DuelBall, fallback_direction: pygame.Vector2, movement_scale: float = 1.0) -> None:
+    if ball.charge_frames > 0:
+        return
+    scale = max(0.35, movement_scale)
+    min_speed = DUEL_MIN_SPEED_PER_FRAME * FPS / scale
+    max_speed = DUEL_MAX_SPEED_PER_FRAME * FPS / scale
+    if ball.velocity.length_squared() == 0:
+        direction = fallback_direction.normalize() if fallback_direction.length_squared() > 0 else pygame.Vector2(1, 0)
+        ball.velocity = direction * min_speed
+        return
+
+    speed = ball.velocity.length()
+    if speed < min_speed:
+        ball.velocity.scale_to_length(min_speed)
+    elif speed > max_speed:
+        ball.velocity.scale_to_length(max_speed)
 
 
 @dataclass
@@ -1767,10 +1787,11 @@ def update_duel_ball(
         ball.velocity.rotate_ip(rng.uniform(-22, 22))
         ball.skill_cooldown = 120
 
-    movement_scale = 0.55 if ball.slow_frames > 0 else 1.0
-    ball.position += ball.velocity * movement_scale / FPS
     arena_center = pygame.Vector2(arena_rect.center)
     to_center = arena_center - ball.position
+    movement_scale = 0.55 if ball.slow_frames > 0 else 1.0
+    clamp_duel_velocity(ball, to_center, movement_scale)
+    ball.position += ball.velocity * movement_scale / FPS
     if ball.velocity.length_squared() > 0 and to_center.length_squared() > 0:
         distance_ratio = to_center.length() / max(1, arena_rect.width * 0.5)
         edge_margin = min(
@@ -1803,6 +1824,7 @@ def update_duel_ball(
     elif ball.position.y + ball.radius > arena_rect.bottom:
         ball.position.y = arena_rect.bottom - ball.radius
         ball.velocity.y = -abs(ball.velocity.y)
+    clamp_duel_velocity(ball, arena_center - ball.position, movement_scale)
 
 
 def apply_burn(ball: DuelBall, popups: list[DamagePopup], effects: list[DuelEffect], audio_events: list[AudioEvent], frame_index: int) -> int:
