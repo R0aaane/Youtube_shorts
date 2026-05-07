@@ -42,6 +42,7 @@ def test_food_duel_realistic_sprites_exist() -> None:
     assert Path("assets/food_sprites/pizza_alpha.png").exists()
     assert Path("assets/food_sprites/burger_alpha.png").exists()
     assert Path("assets/food_sprites/sushi_alpha.png").exists()
+    assert Path("assets/skill_effects/food_skill_sheet_alpha.png").exists()
     assert Path("assets/food_sprites/kitchen_battle_bg.png").exists()
     assert Path("assets/food_sprites/kitchen_battle_bg_optimized.png").exists()
     for ingredient in ["lettuce", "cheese", "tomato", "meat"]:

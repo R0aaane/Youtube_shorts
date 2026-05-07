@@ -76,6 +76,8 @@ output/logs/
 !assets/**/.gitkeep
 !assets/food_sprites/
 !assets/food_sprites/*.png
+!assets/skill_effects/
+!assets/skill_effects/*.png
 !configs/
 !configs/**/*.json
 

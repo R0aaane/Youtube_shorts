@@ -1,5 +1,41 @@
 # CHANGELOG
 
+## 0.20.1 - 2026-05-08
+
+### Added
+
+- Added food duel endgame callouts for `DANGER!`, `ONE HIT LEFT!`, and `FINAL HIT!`.
+
+### Changed
+
+- Shortened the default food duel pacing by increasing base damage, cheese damage, movement speed, charge speed, and skill frequency.
+- Shortened the food duel result hold so the generated Shorts output stays closer to the 20-30 second target.
+- Strengthened large-hit impact flashes, shockwaves, and light screen shake without changing the Sushi or cheese skill flow.
+- Improved skill label readability with a thicker black outline and pop-fade scaling.
+- Updated the duel result headline to show winner text with an exclamation mark.
+
+## 0.20.0 - 2026-05-08
+
+### Added
+
+- Added a Food Duel config editor to the Tkinter launcher for matchup, HP, radius, speed, damage, seed, and audio settings.
+- Added a generated transparent food skill effect sprite sheet for cheese, wasabi, soy, and fresh heal visuals.
+
+### Changed
+
+- Updated food duel skill rendering to layer generated realistic food/liquid effect sprites with the existing code-drawn trails, rings, and particles.
+- Cleaned up launcher command labels and documented the config editor.
+
+## 0.19.1 - 2026-05-08
+
+### Changed
+
+- Replaced the Sushi duel sprite with a larger photoreal salmon nigiri cutout and tightened sprite trimming so Sushi reads more clearly on Shorts.
+- Improved Sushi skill visuals with distinct wasabi blobs/trails/status particles, soy droplets/slow rings, roll dash speed lines, and fresh heal rings/bubbles/callouts.
+- Improved Pizza Cheese Shot visuals so projectiles and impacts look more like melted cheese instead of simple yellow balls.
+- Differentiated Sushi and cheese skill sound cues with wetter food-style splats, liquid splashes, roll acceleration, and fresh heal pops.
+- Updated food duel documentation for the enhanced Sushi and cheese skill presentation.
+
 ## 0.19.0 - 2026-05-08
 
 ### Added

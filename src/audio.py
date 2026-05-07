@@ -219,8 +219,9 @@ def add_event_sound(samples: list[float], kind: str, seconds: float) -> None:
     elif kind == "fire_tick":
         add_sizzle(samples, seconds, volume=0.07)
     elif kind == "cheese_shot":
-        add_splat(samples, seconds, volume=0.13)
-        add_noise_hit(samples, seconds + 0.06, 0.09, 0.07, seed=1468, lowpass=0.28)
+        add_wet_splat(samples, seconds, volume=0.15)
+        add_swept_tone(samples, seconds + 0.012, 0.2, 180, 76, 0.06)
+        add_noise_hit(samples, seconds + 0.06, 0.12, 0.075, seed=1468, lowpass=0.18)
     elif kind == "cheese_stick":
         add_wet_splat(samples, seconds, volume=0.2)
     elif kind == "cheese_tick":
@@ -232,20 +233,28 @@ def add_event_sound(samples: list[float], kind: str, seconds: float) -> None:
     elif kind == "charge_start":
         add_noise_hit(samples, seconds, 0.18, 0.1, seed=7001, lowpass=0.2)
         add_tone(samples, seconds, 0.18, 118, 0.09)
+    elif kind == "roll_start":
+        add_noise_hit(samples, seconds, 0.16, 0.12, seed=6120, lowpass=0.34)
+        add_swept_tone(samples, seconds + 0.005, 0.2, 310, 118, 0.075)
+        add_noise_hit(samples, seconds + 0.055, 0.08, 0.055, seed=6121, lowpass=0.58)
     elif kind == "charge_hit":
         add_sub_bass_hit(samples, seconds, volume=0.34)
     elif kind == "sushi_shot":
-        add_noise_hit(samples, seconds, 0.1, 0.08, seed=4411, lowpass=0.48)
-        add_swept_tone(samples, seconds + 0.01, 0.12, 420, 250, 0.055)
+        add_noise_hit(samples, seconds, 0.09, 0.085, seed=4411, lowpass=0.56)
+        add_swept_tone(samples, seconds + 0.006, 0.1, 360, 190, 0.045)
+        add_splat(samples, seconds + 0.028, volume=0.055)
     elif kind == "sushi_hit":
-        add_splat(samples, seconds, volume=0.12)
-        add_sizzle(samples, seconds + 0.025, volume=0.045)
+        add_splat(samples, seconds, volume=0.105)
+        add_sizzle(samples, seconds + 0.018, volume=0.06)
     elif kind == "soy_splash":
-        add_wet_splat(samples, seconds, volume=0.13)
-        add_tone(samples, seconds + 0.03, 0.12, 118, 0.035)
+        add_wet_splat(samples, seconds, volume=0.155)
+        add_noise_hit(samples, seconds + 0.055, 0.14, 0.07, seed=9090, lowpass=0.23)
+        add_tone(samples, seconds + 0.03, 0.12, 104, 0.028)
     elif kind == "heal":
         add_crunch(samples, seconds, volume=0.055)
-        add_tone(samples, seconds + 0.02, 0.18, 620, 0.05)
+        add_noise_hit(samples, seconds + 0.015, 0.09, 0.045, seed=5151, lowpass=0.64)
+        add_tone(samples, seconds + 0.02, 0.16, 620, 0.038)
+        add_tone(samples, seconds + 0.045, 0.18, 930, 0.026)
     elif kind in {"victory", "win"}:
         add_kitchen_ding(samples, seconds)
 

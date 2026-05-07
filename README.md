@@ -132,12 +132,12 @@ Food skill duel:
 python src/generate_video.py --config configs/food_duel.json
 ```
 
-This creates a large-ball 1v1 battle where two food balls use their own skills instead of cooperating against a boss. The default matchup is Pizza Cheese vs Burger Charge+Ally.
+This creates a large-ball 1v1 battle where two food balls use their own skills instead of cooperating against a boss. The default matchup is Pizza Cheese vs Sushi Technique.
 Pizza Cheese fires sticky cheese projectiles that attach and melt for periodic damage. Burger Charge shows a red dash trail, spends HP to launch one realistic ingredient ally per charge, and only the charge impact triggers hit-stop.
 Ingredient allies bounce around the arena after separating instead of chasing the opponent. Each ingredient keeps the HP Burger spent to create it, and deals that remaining HP as red Burger-side damage when it hits Pizza. As Burger summons ingredients, its sprite switches to generated missing-ingredient burger variants such as no-lettuce, no-cheese, no-tomato, and no-patty states. Once all ingredients are spent, Burger reloads for about 3 seconds and the sprite refills in reverse order.
 Damage colors are side-based for readability: Pizza attacks use yellow numbers and effects, while Burger and ingredient attacks use red. Burger Charge also uses red trails and impact rings. The result screen zooms the winning food into focus so the winner is clear at the end.
 The food duel uses a square wooden tray-style battle area with subtle cutting-board lines and large segmented HP panels at the top of the frame so Shorts UI does not cover them.
-The generated MP4 includes food-battle audio: English READY/FIGHT voice clips when available, wet food bumps for ball collisions, distinct light smacks for small damage, low charge impacts, wet cheese splats, melt sizzles, ingredient squash sounds, and a short victory ding. The matching WAV is saved under `output/audio/`.
+The generated MP4 includes food-battle audio: English READY/FIGHT voice clips when available, wet food bumps for ball collisions, distinct light smacks for small damage, low charge impacts, wet cheese splats, Sushi wasabi/soy/roll/heal sounds, melt sizzles, ingredient squash sounds, and a short victory ding. The matching WAV is saved under `output/audio/`.
 The default duel config uses `duration_seconds` only as an initial layout/progress estimate. The duel keeps going until one side reaches 0 HP. `duel_speed_scale` controls normal movement speed, and `duel_charge_speed` controls charge speed.
 Food duel uses realistic generated food sprites from `assets/food_sprites/`, including Burger and Pizza state variants, with subtle glow and shadow so the characters stand out from the simplified arena. Collision remains circle-based internally, but the visible objects are the food sprites. Heavy hits trigger hit-stop, screen shake, and larger shockwave effects.
 Damage text scales by damage amount: small ticks stay short and compact, medium hits use the standard popup, strong hits add larger text, and only strong hits show shockwaves. 50+ damage shows an extra `CRITICAL!` callout. Sticky cheese is drawn on top of the target food sprite as melted cheese so the ongoing Pizza effect is visible. Pizza loses visible cheese as it fires and reloads its cheese over about 3 seconds when empty.
@@ -145,7 +145,8 @@ Food duel visuals keep the simple wooden-board style, but add stronger character
 Pizza and Burger show a `Reloading...` label while their cheese or ingredients are being restored.
 The duel intro is shortened for Shorts retention: READY lasts under half a second, FIGHT starts quickly, and the default starting positions force the first skill and hit in the opening second. The main food sprites and HUD HP bars are sized for smartphone viewing.
 Food duel no longer ends by the configured 20-second limit. It keeps rendering until one side reaches 0 HP, then writes the 3-second result screen.
-SUSHI is available as a technical duel character. The default food duel config uses `PIZZA vs SUSHI`; Sushi has a salmon nigiri sprite and cycles through `WASABI SHOT`, `SOY SPLASH`, `ROLL DASH`, and `FRESH HEAL`.
+SUSHI is available as a technical duel character. The default food duel config uses `PIZZA vs SUSHI`; Sushi has a larger photoreal salmon nigiri sprite and cycles through visually distinct `WASABI SHOT`, `SOY SPLASH`, `ROLL DASH`, and `FRESH HEAL` effects. Wasabi uses green blobs, trails, splash, and DOT particles; Soy uses translucent brown droplets and slow rings; Roll Dash uses fast spin, pale speed lines, and a larger impact ring; Fresh Heal uses aqua rings, bubbles, and a visible heal callout.
+Food skill effects can use the generated alpha sprite sheet at `assets/skill_effects/food_skill_sheet_alpha.png` so cheese, wasabi, soy, and heal visuals have more realistic food/liquid texture while keeping the existing code-drawn trails and rings.
 
 ## Launcher UI
 
@@ -155,7 +156,7 @@ Run the local command launcher with:
 python src/launcher_ui.py
 ```
 
-The launcher provides buttons for a windowed preview, full frame/audio/MP4/metadata generation, MP4 encoding from existing frames, YouTube upload dry run, and private YouTube upload.
+The launcher provides buttons for a windowed preview, full frame/audio/MP4/metadata generation, MP4 encoding from existing frames, YouTube upload dry run, and private YouTube upload. It also includes a small Food Duel config editor for changing the left/right foods, HP, radius, speed, damage, random seed, and audio toggle before running commands.
 
 It runs these steps in order:
 
