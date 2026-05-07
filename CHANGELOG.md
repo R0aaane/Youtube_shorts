@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## 0.18.2 - 2026-05-08
+
+### Changed
+
+- Added a `Reloading...` label above food duel characters while Pizza cheese or Burger ingredients are reloading.
+- Updated food duel documentation for the reload label.
+
+## 0.18.1 - 2026-05-08
+
+### Changed
+
+- Enhanced food duel hit visuals with stronger shockwave rings, food-like particles, and brief large-hit flashes.
+- Made strong damage popups larger and changed the top damage callout to `CRITICAL!`.
+- Increased Pizza and Burger glow/shadow treatment and added animated skill label scaling/fading.
+- Added subtle board depth, outer glow, and vignette-style center emphasis to the duel background.
+- Updated food duel documentation for the revised visual polish.
+
 ## 0.18.0 - 2026-05-08
 
 ### Added

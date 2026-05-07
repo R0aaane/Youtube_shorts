@@ -189,11 +189,11 @@ class AudioEvent:
 
 def damage_popup_style(amount: int) -> tuple[int, float, str]:
     if amount >= 50:
-        return 72, 1.55, "BIG HIT!"
+        return 86, 1.75, "CRITICAL!"
     if amount >= 25:
-        return 58, 1.25, ""
+        return 66, 1.38, ""
     if amount >= 10:
-        return 46, 1.0, ""
+        return 50, 1.06, ""
     return 30, 0.72, ""
 
 
@@ -1024,15 +1024,16 @@ def draw_food_sprite(surface: pygame.Surface, ball: DuelBall, position: tuple[in
         return False
 
     glow = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-    glow_color = (*duel_attack_color(ball.skin), 42)
-    pygame.draw.circle(glow, glow_color, position, round(ball.radius * 1.35))
-    pygame.draw.circle(glow, (*duel_attack_color(ball.skin), 88), position, round(ball.radius * 1.02), width=5)
+    glow_color = (*duel_attack_color(ball.skin), 54)
+    pygame.draw.circle(glow, glow_color, position, round(ball.radius * 1.55))
+    pygame.draw.circle(glow, (*duel_attack_color(ball.skin), 98), position, round(ball.radius * 1.12), width=6)
+    pygame.draw.circle(glow, (255, 246, 216, 36), (position[0] - round(ball.radius * 0.18), position[1] - round(ball.radius * 0.22)), round(ball.radius * 0.72))
     surface.blit(glow, (0, 0))
     rotated = pygame.transform.rotozoom(sprite, -ball.visual_angle, 1.0)
     rect = rotated.get_rect(center=position)
     shadow = rotated.copy()
-    shadow.fill((0, 0, 0, 150), special_flags=pygame.BLEND_RGBA_MULT)
-    surface.blit(shadow, rect.move(10, 14))
+    shadow.fill((0, 0, 0, 165), special_flags=pygame.BLEND_RGBA_MULT)
+    surface.blit(shadow, rect.move(12, 18))
     surface.blit(rotated, rect)
     return True
 
@@ -1074,49 +1075,101 @@ def draw_duel_ball(surface: pygame.Surface, ball: DuelBall, font: pygame.font.Fo
         draw_scaled_food_skin(surface, ball.skin, position, ball.radius)
     draw_text_with_shadow(surface, font, str(max(0, ball.hp)), position, (255, 255, 255))
     if ball.charge_frames > 0:
-        label_font = make_font(34, bold=True, italic=True)
-        draw_text_with_shadow(surface, label_font, "CHARGE", (position[0], position[1] - ball.radius - 44), duel_attack_color("burger"))
+        pulse = 1 + math.sin(ball.charge_frames * 0.42) * 0.12
+        label_font = make_font(round(37 * pulse), bold=True, italic=True)
+        draw_text_with_shadow(surface, label_font, "CHARGE", (position[0], position[1] - ball.radius - 48), duel_attack_color("burger"))
     elif ball.burn_frames > 0:
-        label_font = make_font(34, bold=True, italic=True)
-        draw_text_with_shadow(surface, label_font, "BURN", (position[0], position[1] - ball.radius - 44), (255, 172, 58))
+        pulse = 1 + math.sin(ball.burn_frames * 0.38) * 0.1
+        label_font = make_font(round(36 * pulse), bold=True, italic=True)
+        draw_text_with_shadow(surface, label_font, "BURN", (position[0], position[1] - ball.radius - 48), (255, 172, 58))
+    elif ball.reload_frames > 0:
+        pulse = 1 + math.sin(ball.reload_frames * 0.22) * 0.08
+        label_font = make_font(round(34 * pulse), bold=True, italic=True)
+        draw_text_with_shadow(surface, label_font, "Reloading...", (position[0], position[1] - ball.radius - 48), (255, 236, 190))
+
+
+def draw_duel_particles(surface: pygame.Surface, center: tuple[int, int], color: tuple[int, int, int], progress: float, count: int, spread: float) -> None:
+    for index in range(count):
+        angle = index * (360 / count) + math.sin(index * 1.7) * 16
+        distance = spread * (0.25 + progress * (0.72 + (index % 3) * 0.12))
+        particle = pygame.Vector2(center) + pygame.Vector2(1, 0).rotate(angle) * distance
+        radius = max(3, round((1 - progress) * (7 + index % 4)))
+        particle_color = pygame.Color(color).lerp(pygame.Color(255, 239, 196), 0.25 + (index % 2) * 0.18)
+        pygame.draw.circle(surface, particle_color, (round(particle.x), round(particle.y)), radius)
+
+
+def draw_skill_label(
+    surface: pygame.Surface,
+    text: str,
+    center: tuple[int, int],
+    color: tuple[int, int, int],
+    progress: float,
+    base_size: int = 42,
+) -> None:
+    alpha = max(0, min(255, round(255 * (1 - progress))))
+    scale = 1 + progress * 0.45
+    font = make_font(round(base_size * scale), bold=True, italic=True)
+    text_surface = font.render(text, True, color)
+    shadow_surface = font.render(text, True, (0, 0, 0))
+    text_surface.set_alpha(alpha)
+    shadow_surface.set_alpha(round(alpha * 0.7))
+    y = center[1] - round(progress * 34)
+    rect = text_surface.get_rect(center=(center[0], y))
+    surface.blit(shadow_surface, rect.move(4, 4))
+    surface.blit(text_surface, rect)
+
+
+def should_draw_skill_label(label: str) -> bool:
+    return label in {"CHEESE SHOT", "CHARGE HIT", "LETTUCE", "CHEESE", "TOMATO", "MEAT"}
 
 
 def draw_duel_effects(surface: pygame.Surface, effects: list[DuelEffect]) -> None:
-    label_font = make_font(42, bold=True, italic=True)
     for effect in effects:
         progress = 1 - effect.frames_left / max(1, 36)
         center = (round(effect.position.x), round(effect.position.y))
         if effect.kind == "impact":
-            radius = round(80 + progress * 230)
-            pygame.draw.circle(surface, effect.color, center, radius, width=12)
-            pygame.draw.circle(surface, duel_attack_color("burger"), center, max(24, round(radius * 0.62)), width=7)
-            pygame.draw.circle(surface, (255, 255, 255), center, max(20, radius // 3), width=4)
+            alpha = max(0, min(210, round(210 * (1 - progress))))
+            flash = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            if effect.label:
+                flash.fill((255, 242, 210, round(34 * (1 - progress))))
+            radius = round(70 + progress * (260 if effect.label else 190))
+            pygame.draw.circle(flash, (*effect.color, alpha), center, radius, width=14)
+            pygame.draw.circle(flash, (255, 244, 214, round(alpha * 0.82)), center, max(20, round(radius * 0.58)), width=7)
+            pygame.draw.circle(flash, (255, 255, 255, round(alpha * 0.72)), center, max(18, radius // 3), width=4)
             for angle in range(0, 360, 30):
                 start = pygame.Vector2(center) + pygame.Vector2(1, 0).rotate(angle) * (radius * 0.42)
                 end = pygame.Vector2(center) + pygame.Vector2(1, 0).rotate(angle) * (radius * 0.86)
-                pygame.draw.line(surface, (255, 255, 255), start, end, 4)
+                pygame.draw.line(flash, (255, 255, 255, round(alpha * 0.72)), start, end, 4)
+            surface.blit(flash, (0, 0))
+            draw_duel_particles(surface, center, effect.color, progress, 12 if effect.label else 8, radius * 0.55)
+            if effect.label:
+                draw_skill_label(surface, effect.label, (center[0], center[1] - radius - 18), effect.color, progress, 46)
         elif effect.kind == "burn":
             radius = round(60 + progress * 70)
             pygame.draw.circle(surface, (255, 78, 28), center, radius, width=8)
             pygame.draw.circle(surface, (255, 220, 78), center, radius - 18, width=5)
-            if effect.label:
-                draw_text_with_shadow(surface, label_font, effect.label, (center[0], center[1] - radius - 24), effect.color)
+            if effect.label and should_draw_skill_label(effect.label):
+                draw_skill_label(surface, effect.label, (center[0], center[1] - radius - 24), effect.color, progress)
         elif effect.kind == "charge":
-            radius = round(50 + progress * 90)
-            pygame.draw.circle(surface, duel_attack_color("burger"), center, radius, width=7)
-            if effect.label:
-                draw_text_with_shadow(surface, label_font, effect.label, (center[0], center[1] - radius - 22), effect.color)
+            radius = round(44 + progress * 118)
+            pygame.draw.circle(surface, (255, 232, 205), center, radius + 14, width=3)
+            pygame.draw.circle(surface, duel_attack_color("burger"), center, radius, width=8)
+            draw_duel_particles(surface, center, duel_attack_color("burger"), progress, 7, radius * 0.55)
+            if effect.label and should_draw_skill_label(effect.label):
+                draw_skill_label(surface, effect.label, (center[0], center[1] - radius - 22), effect.color, progress)
         elif effect.kind == "cheese":
             radius = round(34 + progress * 65)
             pygame.draw.circle(surface, (255, 220, 64), center, radius, width=8)
             pygame.draw.circle(surface, (255, 250, 180), center, max(12, radius // 2), width=4)
-            if effect.label:
-                draw_text_with_shadow(surface, label_font, effect.label, (center[0], center[1] - radius - 20), effect.color)
+            draw_duel_particles(surface, center, (255, 220, 64), progress, 6, radius * 0.6)
+            if effect.label and should_draw_skill_label(effect.label):
+                draw_skill_label(surface, effect.label, (center[0], center[1] - radius - 20), effect.color, progress, 38)
         elif effect.kind == "ingredient":
             radius = round(28 + progress * 52)
             pygame.draw.circle(surface, effect.color, center, radius, width=7)
-            if effect.label:
-                draw_text_with_shadow(surface, label_font, effect.label, (center[0], center[1] - radius - 18), effect.color)
+            draw_duel_particles(surface, center, effect.color, progress, 6, radius * 0.72)
+            if effect.label and should_draw_skill_label(effect.label):
+                draw_skill_label(surface, effect.label, (center[0], center[1] - radius - 18), effect.color, progress, 36)
 
 
 def draw_cheese_projectiles(surface: pygame.Surface, projectiles: list[CheeseProjectile]) -> None:
@@ -1198,17 +1251,24 @@ def draw_duel_background(surface: pygame.Surface) -> pygame.Rect:
     vs_font = make_font(88, bold=True, italic=True)
 
     board_rect = pygame.Rect(round(WIDTH * 0.035), round(HEIGHT * 0.035), round(WIDTH * 0.93), round(HEIGHT * 0.86))
+    pygame.draw.rect(cached, (18, 11, 8), board_rect.move(0, 18), border_radius=30)
     pygame.draw.rect(cached, (43, 27, 18), board_rect, border_radius=28)
     pygame.draw.rect(cached, (66, 42, 27), board_rect.inflate(-18, -18), border_radius=22)
+    pygame.draw.rect(cached, (91, 59, 36), board_rect.inflate(-34, -34), width=3, border_radius=18)
     for x in range(board_rect.left + 38, board_rect.right, 86):
         pygame.draw.line(cached, (79, 51, 32), (x, board_rect.top + 24), (x, board_rect.bottom - 24), 2)
     for x in range(board_rect.left + 78, board_rect.right, 172):
         pygame.draw.line(cached, (32, 20, 14), (x, board_rect.top + 28), (x, board_rect.bottom - 28), 1)
 
     arena_shadow = arena_rect.move(0, 10)
+    outer_glow = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    pygame.draw.rect(outer_glow, (255, 225, 160, 34), arena_rect.inflate(30, 30), border_radius=18)
+    pygame.draw.rect(outer_glow, (0, 0, 0, 92), arena_shadow.inflate(18, 14), border_radius=16)
+    cached.blit(outer_glow, (0, 0))
     pygame.draw.rect(cached, (13, 9, 8), arena_shadow, border_radius=10)
     pygame.draw.rect(cached, (101, 66, 39), arena_rect, border_radius=8)
     pygame.draw.rect(cached, (139, 93, 55), arena_rect.inflate(-14, -14), border_radius=6)
+    pygame.draw.rect(cached, (164, 111, 67), pygame.Rect(arena_rect.left + 18, arena_rect.top + 18, arena_rect.width - 36, round(arena_rect.height * 0.42)), border_radius=6)
     for y in range(arena_rect.top + 44, arena_rect.bottom - 28, 72):
         pygame.draw.line(cached, (160, 108, 66), (arena_rect.left + 22, y), (arena_rect.right - 22, y), 2)
         pygame.draw.line(cached, (94, 59, 34), (arena_rect.left + 26, y + 3), (arena_rect.right - 26, y + 3), 1)
@@ -1216,6 +1276,11 @@ def draw_duel_background(surface: pygame.Surface) -> pygame.Rect:
         pygame.draw.line(cached, (157, 103, 61), (x, arena_rect.top + 28), (x, arena_rect.bottom - 28), 1)
     pygame.draw.rect(cached, (237, 219, 178), arena_rect, width=5, border_radius=8)
     pygame.draw.rect(cached, (177, 134, 86), arena_rect.inflate(-12, -12), width=2, border_radius=6)
+    vignette = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    pygame.draw.circle(vignette, (255, 224, 154, 22), arena_rect.center, round(arena_rect.width * 0.62))
+    for inset, alpha in [(0, 90), (34, 54), (76, 32)]:
+        pygame.draw.rect(vignette, (0, 0, 0, alpha), pygame.Rect(inset, inset, WIDTH - inset * 2, HEIGHT - inset * 2), width=34, border_radius=24)
+    cached.blit(vignette, (0, 0))
     draw_text_with_shadow(cached, vs_font, "VS", (WIDTH // 2, round(HEIGHT * 0.138)), (238, 229, 206), (34, 20, 14))
     DUEL_BACKGROUND_CACHE = cached
     surface.blit(DUEL_BACKGROUND_CACHE, (0, 0))
@@ -1544,7 +1609,7 @@ def update_ingredient_allies(
             effects.append(DuelEffect("ingredient", ally.position.copy(), 24, duel_attack_color("burger"), ally.kind.upper()))
             if dealt >= 25:
                 effect_frames = 34 if dealt >= 50 else 28
-                effects.append(DuelEffect("impact", target.position.copy(), effect_frames, duel_attack_color("burger"), "BIG HIT!" if dealt >= 50 else ""))
+                effects.append(DuelEffect("impact", target.position.copy(), effect_frames, duel_attack_color("burger"), "CRITICAL!" if dealt >= 50 else ""))
             audio_events.append(AudioEvent(frame_index, "ingredient_hit"))
             audio_events.append(AudioEvent(frame_index, damage_audio_kind(dealt)))
             ally.hit_cooldown = 42
@@ -1593,7 +1658,7 @@ def handle_duel_collision(
         popups.append(make_damage_popup(damage, right.position.copy(), duel_attack_color(left.skin)))
         if damage >= 25:
             effect_frames = 34 if damage >= 50 else 28
-            effects.append(DuelEffect("impact", right.position.copy(), effect_frames, duel_attack_color(left.skin), "BIG HIT!" if damage >= 50 else ""))
+            effects.append(DuelEffect("impact", right.position.copy(), effect_frames, duel_attack_color(left.skin), "CRITICAL!" if damage >= 50 else ""))
         audio_events.append(AudioEvent(frame_index, damage_audio_kind(damage)))
         hit_landed = True
         burger_charge_hit = burger_charge_hit or was_burger_charge
@@ -1609,7 +1674,7 @@ def handle_duel_collision(
         popups.append(make_damage_popup(damage, left.position.copy(), duel_attack_color(right.skin)))
         if damage >= 25:
             effect_frames = 34 if damage >= 50 else 28
-            effects.append(DuelEffect("impact", left.position.copy(), effect_frames, duel_attack_color(right.skin), "BIG HIT!" if damage >= 50 else ""))
+            effects.append(DuelEffect("impact", left.position.copy(), effect_frames, duel_attack_color(right.skin), "CRITICAL!" if damage >= 50 else ""))
         audio_events.append(AudioEvent(frame_index, damage_audio_kind(damage)))
         hit_landed = True
         burger_charge_hit = burger_charge_hit or was_burger_charge
