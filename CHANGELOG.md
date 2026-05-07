@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## 0.17.0 - 2026-05-07
+
+### Added
+
+- Added generated Pizza sprite variants with progressively depleted cheese.
+- Added Burger and Pizza reload behavior that restores visual sprite states over about 3 seconds.
+
+### Changed
+
+- Changed Burger ingredient spawning so a fully emptied Burger reloads before spawning more ingredients.
+- Changed Pizza cheese shots so the Pizza sprite loses cheese as shots are fired and reloads when empty.
+- Updated food duel documentation for sprite reload behavior.
+
 ## 0.16.0 - 2026-05-07
 
 ### Added

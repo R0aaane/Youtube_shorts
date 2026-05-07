@@ -168,6 +168,8 @@ class DuelBall:
     trail: list[pygame.Vector2] = field(default_factory=list)
     visual_angle: float = 0.0
     missing_ingredients: list[str] = field(default_factory=list)
+    reload_frames: int = 0
+    cheese_spent: int = 0
 
 
 @dataclass
@@ -206,6 +208,17 @@ def damage_audio_kind(amount: int) -> str:
     if amount >= 25:
         return "heavy_hit"
     return "soft_hit"
+
+
+def update_food_reload(ball: DuelBall) -> None:
+    if ball.reload_frames <= 0:
+        return
+    ball.reload_frames -= 1
+    step = max(1, round(FPS * 0.75))
+    if ball.skin == "burger" and ball.reload_frames % step == 0 and ball.missing_ingredients:
+        ball.missing_ingredients.pop()
+    elif ball.skin == "pizza" and ball.reload_frames % step == 0 and ball.cheese_spent > 0:
+        ball.cheese_spent -= 1
 
 
 @dataclass
@@ -937,9 +950,10 @@ def load_kitchen_background() -> pygame.Surface | None:
     return BACKGROUND_CACHE
 
 
-def load_food_sprite(skin: str, radius: int, missing_stage: int = 0) -> pygame.Surface | None:
+def load_food_sprite(skin: str, radius: int, missing_stage: int = 0, cheese_stage: int = 0) -> pygame.Surface | None:
     missing_stage = min(4, max(0, missing_stage if skin == "burger" else 0))
-    cache_key = f"{skin}:{radius}:{missing_stage}"
+    cheese_stage = min(4, max(0, cheese_stage if skin == "pizza" else 0))
+    cache_key = f"{skin}:{radius}:{missing_stage}:{cheese_stage}"
     if cache_key in SPRITE_CACHE:
         return SPRITE_CACHE[cache_key]
 
@@ -949,10 +963,20 @@ def load_food_sprite(skin: str, radius: int, missing_stage: int = 0) -> pygame.S
         3: FOOD_SPRITES_DIR / "burger_missing_lettuce_cheese_tomato_alpha.png",
         4: FOOD_SPRITES_DIR / "burger_missing_lettuce_cheese_tomato_meat_alpha.png",
     }
+    pizza_variants = {
+        1: FOOD_SPRITES_DIR / "pizza_cheese_1_alpha.png",
+        2: FOOD_SPRITES_DIR / "pizza_cheese_2_alpha.png",
+        3: FOOD_SPRITES_DIR / "pizza_cheese_3_alpha.png",
+        4: FOOD_SPRITES_DIR / "pizza_cheese_4_alpha.png",
+    }
     if skin == "burger" and missing_stage > 0:
         sprite_path = burger_variants.get(missing_stage)
         if sprite_path is not None and not sprite_path.exists():
             sprite_path = FOOD_SPRITES_DIR / "burger_alpha.png"
+    elif skin == "pizza" and cheese_stage > 0:
+        sprite_path = pizza_variants.get(cheese_stage)
+        if sprite_path is not None and not sprite_path.exists():
+            sprite_path = FOOD_SPRITES_DIR / "pizza_alpha.png"
     else:
         sprite_paths = {
             "pizza": FOOD_SPRITES_DIR / "pizza_alpha.png",
@@ -995,7 +1019,7 @@ def load_ingredient_sprite(kind: str, radius: int) -> pygame.Surface | None:
 
 def draw_food_sprite(surface: pygame.Surface, ball: DuelBall, position: tuple[int, int]) -> bool:
     missing_stage = len(ball.missing_ingredients) if ball.skin == "burger" else 0
-    sprite = load_food_sprite(ball.skin, ball.radius, missing_stage)
+    sprite = load_food_sprite(ball.skin, ball.radius, missing_stage, ball.cheese_spent)
     if sprite is None:
         return False
 
@@ -1312,6 +1336,7 @@ def update_duel_ball(
         ball.hit_cooldown -= 1
     if ball.charge_frames > 0:
         ball.charge_frames -= 1
+    update_food_reload(ball)
 
     ball.trail.append(ball.position.copy())
     if len(ball.trail) > 10:
@@ -1320,36 +1345,44 @@ def update_duel_ball(
     if ball.skin == "burger" and ball.skill_cooldown == 0:
         direction = target.position - ball.position
         if direction.length_squared() > 0:
-            paid_cost = min(max(0, ball.hp - 1), burger_hp_cost)
-            if paid_cost > 0:
-                ball.hp -= paid_cost
-                ingredient_kinds = ["lettuce", "cheese", "tomato", "meat"]
-                ingredient_kind = ingredient_kinds[len(ball.missing_ingredients) % len(ingredient_kinds)]
-                ball.missing_ingredients.append(ingredient_kind)
-                spawn_direction = -direction.normalize()
-                spawn_offset = spawn_direction.rotate(rng.uniform(-18, 18)) * (ball.radius + round(ball.radius * 0.58))
-                spawn_position = ball.position + spawn_offset
-                target_direction = target.position - spawn_position
-                if target_direction.length_squared() == 0:
-                    target_direction = -spawn_direction
-                velocity = target_direction.normalize().rotate(rng.uniform(-16, 16)) * 500
-                allies.append(
-                    IngredientAlly(
-                        kind=ingredient_kind,
-                        position=spawn_position,
-                        velocity=velocity,
-                        radius=max(46, round(ball.radius * 0.72)),
-                        damage=paid_cost,
-                        hp=paid_cost,
-                        max_hp=paid_cost,
+            if ball.reload_frames > 0:
+                ball.skill_cooldown = 18
+            elif len(ball.missing_ingredients) >= 4:
+                ball.reload_frames = FPS * 3
+                ball.skill_cooldown = 18
+            else:
+                paid_cost = min(max(0, ball.hp - 1), burger_hp_cost)
+                if paid_cost > 0:
+                    ball.hp -= paid_cost
+                    ingredient_kinds = ["lettuce", "cheese", "tomato", "meat"]
+                    ingredient_kind = ingredient_kinds[len(ball.missing_ingredients) % len(ingredient_kinds)]
+                    ball.missing_ingredients.append(ingredient_kind)
+                    if len(ball.missing_ingredients) >= 4:
+                        ball.reload_frames = FPS * 3
+                    spawn_direction = -direction.normalize()
+                    spawn_offset = spawn_direction.rotate(rng.uniform(-18, 18)) * (ball.radius + round(ball.radius * 0.58))
+                    spawn_position = ball.position + spawn_offset
+                    target_direction = target.position - spawn_position
+                    if target_direction.length_squared() == 0:
+                        target_direction = -spawn_direction
+                    velocity = target_direction.normalize().rotate(rng.uniform(-16, 16)) * 500
+                    allies.append(
+                        IngredientAlly(
+                            kind=ingredient_kind,
+                            position=spawn_position,
+                            velocity=velocity,
+                            radius=max(46, round(ball.radius * 0.72)),
+                            damage=paid_cost,
+                            hp=paid_cost,
+                            max_hp=paid_cost,
+                        )
                     )
-                )
-                effects.append(DuelEffect("ingredient", spawn_position, 36, duel_attack_color("burger"), ingredient_kind.upper()))
-                audio_events.append(AudioEvent(frame_index, "ingredient_spawn"))
-            ball.velocity = direction.normalize() * charge_speed
-            ball.charge_frames = 36
-            ball.skill_cooldown = 132
-            audio_events.append(AudioEvent(frame_index, "charge_start"))
+                    effects.append(DuelEffect("ingredient", spawn_position, 36, duel_attack_color("burger"), ingredient_kind.upper()))
+                    audio_events.append(AudioEvent(frame_index, "ingredient_spawn"))
+                ball.velocity = direction.normalize() * charge_speed
+                ball.charge_frames = 36
+                ball.skill_cooldown = 132
+                audio_events.append(AudioEvent(frame_index, "charge_start"))
     elif ball.skill_cooldown == 0 and ball.skin != "pizza":
         ball.velocity.rotate_ip(rng.uniform(-22, 22))
         ball.skill_cooldown = 120
@@ -1398,12 +1431,22 @@ def fire_cheese_projectile(
     frame_index: int,
     speed: int,
 ) -> None:
+    if attacker.reload_frames > 0:
+        attacker.skill_cooldown = 18
+        return
+    if attacker.cheese_spent >= 4:
+        attacker.reload_frames = FPS * 3
+        attacker.skill_cooldown = 18
+        return
     direction = target.position - attacker.position
     if direction.length_squared() == 0:
         direction = pygame.Vector2(1, 0)
     direction = direction.normalize()
     start = attacker.position + direction * (attacker.radius + 24)
     projectiles.append(CheeseProjectile(position=start, velocity=direction * speed))
+    attacker.cheese_spent += 1
+    if attacker.cheese_spent >= 4:
+        attacker.reload_frames = FPS * 3
     attacker.skill_cooldown = 96
     effects.append(DuelEffect("cheese", start.copy(), 24, (255, 228, 82), "CHEESE SHOT"))
     audio_events.append(AudioEvent(frame_index, "cheese_shot"))
