@@ -16,6 +16,7 @@ CLIENT_SECRETS_PATH = PROJECT_ROOT / "client_secrets.json"
 TOKEN_PATH = PROJECT_ROOT / "token.json"
 DEFAULT_PRIVACY_STATUS = "private"
 YOUTUBE_UPLOAD_SCOPE = ["https://www.googleapis.com/auth/youtube.upload"]
+SHORTS_DESCRIPTION = "#shorts #FoodBattle #PhysicsSimulation #BattleSimulation #satisfying"
 REQUIRED_METADATA_KEYS = {
     "title",
     "description",
@@ -41,6 +42,7 @@ def load_metadata(path: Path) -> dict[str, Any]:
         raise ValueError(f"Metadata file is missing required keys: {', '.join(missing_keys)}")
     if not isinstance(metadata["tags"], list):
         raise ValueError("Metadata key `tags` must be a JSON array.")
+    metadata["description"] = SHORTS_DESCRIPTION
     return metadata
 
 

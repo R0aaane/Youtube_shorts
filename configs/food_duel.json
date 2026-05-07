@@ -19,7 +19,7 @@
   "duel_charge_speed": 760,
   "duel_burger_charge_hp_cost": 40,
   "duel_ingredient_damage": 5,
-  "duel_cheese_damage": 10,
+  "duel_cheese_damage": 7,
   "duel_cheese_projectile_speed": 840,
   "audio_enabled": true
 }

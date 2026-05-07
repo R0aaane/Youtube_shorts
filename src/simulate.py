@@ -194,7 +194,7 @@ class AudioEvent:
 
 def damage_popup_style(amount: int) -> tuple[int, float, str]:
     if amount >= 50:
-        return 86, 1.75, "CRITICAL!"
+        return 96, 2.05, "CRITICAL!"
     if amount >= 25:
         return 66, 1.38, ""
     if amount >= 10:
@@ -1154,12 +1154,16 @@ def draw_duel_ball(surface: pygame.Surface, ball: DuelBall, font: pygame.font.Fo
     if ball.wasabi_frames > 0:
         status = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
         pulse = 1 + math.sin(ball.wasabi_frames * 0.28) * 0.06
-        pygame.draw.circle(status, (94, 240, 116, 92), position, round(ball.radius * 1.22 * pulse), width=6)
-        for index in range(10):
-            angle = ball.wasabi_frames * 4 + index * 36
-            dot = pygame.Vector2(position) + pygame.Vector2(1, 0).rotate(angle) * (ball.radius * (0.82 + (index % 3) * 0.1))
-            pygame.draw.circle(status, (142, 255, 130, 170), (round(dot.x), round(dot.y)), 4 + index % 3)
-        pygame.draw.circle(status, (82, 214, 92, 230), (position[0] - ball.radius - 14, position[1] - ball.radius - 10), 13)
+        pygame.draw.circle(status, (46, 204, 66, 124), position, round(ball.radius * 1.26 * pulse), width=8)
+        pygame.draw.circle(status, (112, 255, 108, 62), position, round(ball.radius * 0.92 * pulse), width=4)
+        for index in range(18):
+            angle = ball.wasabi_frames * 5 + index * 20
+            dot = pygame.Vector2(position) + pygame.Vector2(1, 0).rotate(angle) * (ball.radius * (0.76 + (index % 4) * 0.11))
+            pygame.draw.circle(status, (100, 255, 94, 190), (round(dot.x), round(dot.y)), 5 + index % 4)
+            if index % 3 == 0:
+                end = dot + pygame.Vector2(1, 0).rotate(angle + 42) * 18
+                pygame.draw.line(status, (184, 255, 128, 132), dot, end, 3)
+        pygame.draw.circle(status, (52, 190, 58, 238), (position[0] - ball.radius - 14, position[1] - ball.radius - 10), 15)
         surface.blit(status, (0, 0))
     if ball.slow_frames > 0:
         status = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
@@ -1176,18 +1180,18 @@ def draw_duel_ball(surface: pygame.Surface, ball: DuelBall, font: pygame.font.Fo
         pulse = 1 + math.sin(ball.charge_frames * 0.42) * 0.12
         label_font = make_font(round(37 * pulse), bold=True, italic=True)
         label = "ROLL DASH" if ball.skin == "sushi" else "CHARGE"
-        draw_text_with_shadow(surface, label_font, label, (position[0], position[1] - ball.radius - 48), duel_attack_color(ball.skin))
+        draw_text_with_shadow(surface, label_font, label, (position[0], position[1] - ball.radius - 76), duel_attack_color(ball.skin))
     elif ball.burn_frames > 0:
         pulse = 1 + math.sin(ball.burn_frames * 0.38) * 0.1
         label_font = make_font(round(36 * pulse), bold=True, italic=True)
-        draw_text_with_shadow(surface, label_font, "BURN", (position[0], position[1] - ball.radius - 48), (255, 172, 58))
+        draw_text_with_shadow(surface, label_font, "BURN", (position[0], position[1] - ball.radius - 76), (255, 172, 58))
     elif ball.reload_frames > 0:
-        pulse = 1 + math.sin(ball.reload_frames * 0.22) * 0.08
-        label_font = make_font(round(34 * pulse), bold=True, italic=True)
-        draw_text_with_shadow(surface, label_font, "Reloading...", (position[0], position[1] - ball.radius - 48), (255, 236, 190))
+        pulse = 1 + math.sin(ball.reload_frames * 0.22) * 0.1
+        label_font = make_font(round(42 * pulse), bold=True, italic=True)
+        draw_text_with_shadow(surface, label_font, "RELOAD", (position[0], position[1] - ball.radius - 76), (255, 236, 190))
     elif ball.slow_frames > 0:
         label_font = make_font(32, bold=True, italic=True)
-        draw_text_with_shadow(surface, label_font, "SLOWED", (position[0], position[1] - ball.radius - 48), (164, 112, 74))
+        draw_text_with_shadow(surface, label_font, "SLOWED", (position[0], position[1] - ball.radius - 76), (164, 112, 74))
 
 
 def draw_duel_particles(surface: pygame.Surface, center: tuple[int, int], color: tuple[int, int, int], progress: float, count: int, spread: float) -> None:
@@ -1216,7 +1220,7 @@ def draw_skill_label(
     outline_surface = font.render(text, True, (0, 0, 0))
     text_surface.set_alpha(alpha)
     outline_surface.set_alpha(round(alpha * 0.92))
-    y = center[1] - round(progress * 34)
+    y = center[1] - round(progress * 44) - 10
     half_width = text_surface.get_width() // 2
     x = max(half_width + 18, min(WIDTH - half_width - 18, center[0]))
     y = max(text_surface.get_height() // 2 + 18, min(HEIGHT - text_surface.get_height() // 2 - 18, y))
@@ -1252,12 +1256,13 @@ def draw_duel_effects(surface: pygame.Surface, effects: list[DuelEffect]) -> Non
         center = (round(effect.position.x), round(effect.position.y))
         if effect.kind == "impact":
             strong = bool(effect.label) or effect.frames_left >= 26
+            critical = effect.label == "CRITICAL!"
             alpha = max(0, min(230, round((230 if strong else 210) * (1 - progress))))
             flash = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             if strong:
                 flash.fill((255, 242, 210, round((42 if effect.label else 24) * (1 - progress))))
-            radius = round(80 + progress * (310 if effect.label else 235))
-            pygame.draw.circle(flash, (*effect.color, alpha), center, radius, width=16 if strong else 13)
+            radius = round(90 + progress * (380 if critical else 310 if effect.label else 235))
+            pygame.draw.circle(flash, (*effect.color, alpha), center, radius, width=20 if critical else 16 if strong else 13)
             pygame.draw.circle(flash, (255, 244, 214, round(alpha * 0.84)), center, max(20, round(radius * 0.58)), width=8)
             pygame.draw.circle(flash, (255, 255, 255, round(alpha * 0.72)), center, max(18, radius // 3), width=4)
             for angle in range(0, 360, 30):
@@ -1267,7 +1272,8 @@ def draw_duel_effects(surface: pygame.Surface, effects: list[DuelEffect]) -> Non
             surface.blit(flash, (0, 0))
             draw_duel_particles(surface, center, effect.color, progress, 14 if strong else 8, radius * 0.58)
             if effect.label:
-                draw_skill_label(surface, effect.label, (center[0], center[1] - radius - 18), effect.color, progress, 46)
+                label_center = (WIDTH // 2, round(HEIGHT * 0.38)) if critical else (center[0], center[1] - radius - 48)
+                draw_skill_label(surface, effect.label, label_center, effect.color, progress, 68 if critical else 48)
         elif effect.kind == "burn":
             radius = round(60 + progress * 70)
             pygame.draw.circle(surface, (255, 78, 28), center, radius, width=8)
@@ -1286,7 +1292,7 @@ def draw_duel_effects(surface: pygame.Surface, effects: list[DuelEffect]) -> Non
             surface.blit(flash, (0, 0))
             draw_duel_particles(surface, center, effect.color, progress, 10, radius * 0.58)
             if effect.label and should_draw_skill_label(effect.label):
-                draw_skill_label(surface, effect.label, (center[0], center[1] - radius - 22), effect.color, progress)
+                draw_skill_label(surface, effect.label, (center[0], center[1] - radius - 56), effect.color, progress)
         elif effect.kind == "cheese":
             cheese = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             radius = round(34 + progress * 65)
@@ -1298,16 +1304,16 @@ def draw_duel_effects(surface: pygame.Surface, effects: list[DuelEffect]) -> Non
                 scale = 0.76 + ((index * 37) % 5) * 0.08 + progress * 0.16
                 offset = pygame.Vector2(1, 0).rotate(angle + progress * 28) * radius * scale
                 points.append((round(center[0] + offset.x), round(center[1] + offset.y)))
-            pygame.draw.polygon(cheese, (255, 197, 38, round(210 * (1 - progress))), points)
-            pygame.draw.circle(cheese, (255, 236, 95, round(190 * (1 - progress))), center, max(12, radius // 2))
-            for angle in range(20, 360, 70):
-                end = pygame.Vector2(center) + pygame.Vector2(1, 0).rotate(angle) * radius * 1.18
-                pygame.draw.line(cheese, (255, 214, 52, round(170 * (1 - progress))), center, end, max(4, round(10 * (1 - progress))))
-                pygame.draw.circle(cheese, (255, 214, 52, round(190 * (1 - progress))), (round(end.x), round(end.y)), max(4, round(8 * (1 - progress))))
+            pygame.draw.polygon(cheese, (255, 184, 26, round(226 * (1 - progress))), points)
+            pygame.draw.circle(cheese, (255, 231, 74, round(212 * (1 - progress))), center, max(14, radius // 2))
+            for angle in range(12, 360, 48):
+                end = pygame.Vector2(center) + pygame.Vector2(1, 0).rotate(angle) * radius * (1.48 + (angle % 4) * 0.12)
+                pygame.draw.line(cheese, (255, 206, 34, round(194 * (1 - progress))), center, end, max(5, round(13 * (1 - progress))))
+                pygame.draw.circle(cheese, (255, 206, 34, round(208 * (1 - progress))), (round(end.x), round(end.y)), max(5, round(10 * (1 - progress))))
             surface.blit(cheese, (0, 0))
             draw_duel_particles(surface, center, (255, 220, 64), progress, 8, radius * 0.72)
             if effect.label and should_draw_skill_label(effect.label):
-                draw_skill_label(surface, effect.label, (center[0], center[1] - radius - 20), effect.color, progress, 38)
+                draw_skill_label(surface, effect.label, (center[0], center[1] - radius - 56), effect.color, progress, 38)
         elif effect.kind == "wasabi":
             wasabi = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             radius = round(30 + progress * 76)
@@ -1316,13 +1322,13 @@ def draw_duel_effects(surface: pygame.Surface, effects: list[DuelEffect]) -> Non
                 blit_center(wasabi, sprite, center, round(210 * (1 - progress)))
             for angle in range(0, 360, 40):
                 end = pygame.Vector2(center) + pygame.Vector2(1, 0).rotate(angle + progress * 24) * radius * (0.55 + (angle % 4) * 0.09)
-                pygame.draw.line(wasabi, (94, 230, 88, round(150 * (1 - progress))), center, end, max(4, round(11 * (1 - progress))))
-                pygame.draw.circle(wasabi, (157, 255, 124, round(180 * (1 - progress))), (round(end.x), round(end.y)), max(4, round(8 * (1 - progress))))
-            pygame.draw.circle(wasabi, (103, 230, 82, round(110 * (1 - progress))), center, radius, width=8)
+                pygame.draw.line(wasabi, (44, 208, 58, round(178 * (1 - progress))), center, end, max(5, round(12 * (1 - progress))))
+                pygame.draw.circle(wasabi, (112, 255, 92, round(205 * (1 - progress))), (round(end.x), round(end.y)), max(5, round(9 * (1 - progress))))
+            pygame.draw.circle(wasabi, (56, 212, 64, round(142 * (1 - progress))), center, radius, width=10)
             surface.blit(wasabi, (0, 0))
-            draw_duel_particles(surface, center, (106, 244, 96), progress, 12, radius * 0.62)
+            draw_duel_particles(surface, center, (92, 244, 78), progress, 16, radius * 0.78)
             if effect.label and should_draw_skill_label(effect.label):
-                draw_skill_label(surface, effect.label, (center[0], center[1] - radius - 20), effect.color, progress, 38)
+                draw_skill_label(surface, effect.label, (center[0], center[1] - radius - 56), effect.color, progress, 38)
         elif effect.kind == "ingredient":
             radius = round(28 + progress * 52)
             pygame.draw.circle(surface, effect.color, center, radius, width=7)
@@ -1337,33 +1343,36 @@ def draw_duel_effects(surface: pygame.Surface, effects: list[DuelEffect]) -> Non
                 blit_center(splash, sprite, center, round(190 * (1 - progress)))
             pygame.draw.ellipse(
                 splash,
-                (112, 67, 36, round(110 * (1 - progress))),
-                pygame.Rect(center[0] - radius, center[1] + radius // 3, radius * 2, max(14, radius // 2)),
-                width=6,
+                (118, 70, 38, round(140 * (1 - progress))),
+                pygame.Rect(center[0] - round(radius * 1.15), center[1] + radius // 3, round(radius * 2.3), max(18, round(radius * 0.62))),
+                width=8,
             )
-            pygame.draw.circle(splash, (118, 72, 40, round(118 * (1 - progress))), center, radius)
-            for angle in range(0, 360, 36):
-                end = pygame.Vector2(center) + pygame.Vector2(1, 0).rotate(angle) * radius * (0.7 + (angle % 3) * 0.08)
-                pygame.draw.line(splash, (128, 78, 44, round(155 * (1 - progress))), center, end, max(4, round(11 * (1 - progress))))
-                pygame.draw.circle(splash, (178, 121, 70, round(150 * (1 - progress))), (round(end.x), round(end.y)), max(3, round(7 * (1 - progress))))
+            pygame.draw.circle(splash, (124, 74, 40, round(142 * (1 - progress))), center, radius)
+            for angle in range(0, 360, 24):
+                end = pygame.Vector2(center) + pygame.Vector2(1, 0).rotate(angle) * radius * (0.78 + (angle % 5) * 0.08)
+                pygame.draw.line(splash, (134, 80, 44, round(175 * (1 - progress))), center, end, max(5, round(12 * (1 - progress))))
+                pygame.draw.circle(splash, (188, 128, 74, round(170 * (1 - progress))), (round(end.x), round(end.y)), max(5, round(10 * (1 - progress))))
             surface.blit(splash, (0, 0))
             if effect.label and should_draw_skill_label(effect.label):
-                draw_skill_label(surface, effect.label, (center[0], center[1] - radius - 18), effect.color, progress, 36)
+                draw_skill_label(surface, effect.label, (center[0], center[1] - radius - 54), effect.color, progress, 36)
         elif effect.kind == "heal":
             heal = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             radius = round(34 + progress * 74)
             sprite = load_skill_effect_sprite("heal", round(radius * 2.4))
             if sprite is not None:
                 blit_center(heal, sprite, center, round(185 * (1 - progress)))
-            pygame.draw.circle(heal, (144, 238, 204, round(210 * (1 - progress))), center, radius, width=7)
-            pygame.draw.circle(heal, (222, 255, 246, round(180 * (1 - progress))), center, max(12, radius // 2), width=5)
-            for index in range(12):
-                angle = index * 30 + progress * 70
+            pygame.draw.circle(heal, (86, 232, 230, round(230 * (1 - progress))), center, radius, width=9)
+            pygame.draw.circle(heal, (222, 255, 250, round(198 * (1 - progress))), center, max(14, radius // 2), width=6)
+            pygame.draw.circle(heal, (112, 255, 210, round(120 * (1 - progress))), center, round(radius * 1.32), width=5)
+            for index in range(18):
+                angle = index * 20 + progress * 86
                 bubble = pygame.Vector2(center) + pygame.Vector2(1, 0).rotate(angle) * radius * (0.45 + (index % 4) * 0.12)
-                pygame.draw.circle(heal, (202, 255, 238, round(185 * (1 - progress))), (round(bubble.x), round(bubble.y)), max(3, round(8 * (1 - progress))))
+                pygame.draw.circle(heal, (202, 255, 244, round(205 * (1 - progress))), (round(bubble.x), round(bubble.y)), max(4, round(9 * (1 - progress))))
+                if index % 3 == 0:
+                    draw_text_with_shadow(heal, make_font(max(18, round(24 * (1 - progress))), bold=True), "+", (round(bubble.x), round(bubble.y)), (222, 255, 250))
             surface.blit(heal, (0, 0))
             if effect.label and should_draw_skill_label(effect.label):
-                draw_skill_label(surface, effect.label, (center[0], center[1] - radius - 64), effect.color, progress, 34)
+                draw_skill_label(surface, effect.label, (center[0], center[1] - radius - 78), effect.color, progress, 46)
 
 
 def draw_duel_endgame_alerts(surface: pygame.Surface, left: DuelBall, right: DuelBall, frame_index: int) -> None:
@@ -1376,7 +1385,7 @@ def draw_duel_endgame_alerts(surface: pygame.Surface, left: DuelBall, right: Due
         label = "ONE HIT LEFT!" if ratio <= 0.10 else "DANGER!"
         color = (255, 68, 64) if ratio <= 0.10 else (255, 188, 52)
         pulse = 1 + math.sin(frame_index * 0.22) * 0.08
-        font = make_font(round((44 if ratio <= 0.10 else 38) * pulse), bold=True, italic=True)
+        font = make_font(round((58 if ratio <= 0.10 else 48) * pulse), bold=True, italic=True)
         position = (round(WIDTH * (0.25 if index == 0 else 0.75)), round(HEIGHT * 0.142))
         draw_text_with_shadow(surface, font, label, position, color)
         ring = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
@@ -1390,18 +1399,19 @@ def draw_cheese_projectiles(surface: pygame.Surface, projectiles: list[CheesePro
         center = (round(projectile.position.x), round(projectile.position.y))
         layer = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
         direction = projectile.velocity.normalize() if projectile.velocity.length_squared() > 0 else pygame.Vector2(1, 0)
-        for index in range(4):
-            tail = pygame.Vector2(center) - direction * (projectile.radius * (1.2 + index * 0.78))
-            wobble = direction.rotate(90) * math.sin(projectile.frames_left * 0.32 + index) * projectile.radius * 0.24
-            pygame.draw.line(layer, (255, 206, 42, 175 - index * 28), center, tail + wobble, max(5, projectile.radius // 3))
-            pygame.draw.circle(layer, (255, 215, 54, 150 - index * 24), (round((tail + wobble).x), round((tail + wobble).y)), max(4, projectile.radius // 3))
+        for index in range(7):
+            tail = pygame.Vector2(center) - direction * (projectile.radius * (1.45 + index * 0.92))
+            wobble = direction.rotate(90) * math.sin(projectile.frames_left * 0.34 + index * 0.8) * projectile.radius * (0.3 + index * 0.02)
+            alpha = max(38, 198 - index * 24)
+            pygame.draw.line(layer, (255, 198, 28, alpha), center, tail + wobble, max(5, round(projectile.radius * (0.46 - index * 0.025))))
+            pygame.draw.circle(layer, (255, 219, 58, max(42, alpha - 18)), (round((tail + wobble).x), round((tail + wobble).y)), max(4, projectile.radius // 3))
         points = []
         for index, angle in enumerate([0, 55, 118, 188, 252, 315]):
             scale = 0.78 + ((index * 31 + projectile.frames_left) % 5) * 0.06
             offset = pygame.Vector2(1, 0).rotate(angle) * projectile.radius * scale
             points.append((round(center[0] + offset.x), round(center[1] + offset.y)))
-        pygame.draw.polygon(layer, (255, 192, 35, 236), points)
-        pygame.draw.circle(layer, (255, 228, 72, 245), center, round(projectile.radius * 0.78))
+        pygame.draw.polygon(layer, (255, 180, 24, 242), points)
+        pygame.draw.circle(layer, (255, 225, 64, 248), center, round(projectile.radius * 0.84))
         pygame.draw.circle(layer, (255, 250, 186, 220), (center[0] - 5, center[1] - 5), max(5, projectile.radius // 3))
         pygame.draw.polygon(layer, (168, 105, 18, 170), points, width=3)
         sprite = load_skill_effect_sprite("cheese", projectile.radius * 3)
@@ -1416,26 +1426,26 @@ def draw_sushi_projectiles(surface: pygame.Surface, projectiles: list[SushiProje
         layer = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
         direction = projectile.velocity.normalize() if projectile.velocity.length_squared() > 0 else pygame.Vector2(1, 0)
         if projectile.kind == "soy":
-            for index in range(6):
-                tail = pygame.Vector2(center) - direction.rotate((index - 2.5) * 8) * projectile.radius * (0.85 + index * 0.36)
-                pygame.draw.circle(layer, (116, 70, 40, 135 - index * 14), (round(tail.x), round(tail.y)), max(4, projectile.radius // 3))
-            pygame.draw.ellipse(layer, (95, 58, 34, 215), pygame.Rect(center[0] - projectile.radius, center[1] - projectile.radius // 2, projectile.radius * 2, projectile.radius))
-            pygame.draw.circle(layer, (138, 84, 46, 215), center, projectile.radius)
-            pygame.draw.circle(layer, (190, 132, 76, 180), (center[0] - 4, center[1] - 4), max(4, projectile.radius // 3))
+            for index in range(10):
+                tail = pygame.Vector2(center) - direction.rotate((index - 4.5) * 8) * projectile.radius * (0.82 + index * 0.3)
+                pygame.draw.circle(layer, (124, 72, 38, max(42, 158 - index * 12)), (round(tail.x), round(tail.y)), max(6, round(projectile.radius * 0.42)))
+            pygame.draw.ellipse(layer, (96, 56, 30, 228), pygame.Rect(center[0] - round(projectile.radius * 1.18), center[1] - round(projectile.radius * 0.58), round(projectile.radius * 2.36), round(projectile.radius * 1.16)))
+            pygame.draw.circle(layer, (148, 88, 46, 226), center, round(projectile.radius * 1.08))
+            pygame.draw.circle(layer, (204, 140, 78, 194), (center[0] - 5, center[1] - 5), max(5, round(projectile.radius * 0.42)))
             sprite = load_skill_effect_sprite("soy", projectile.radius * 3)
             if sprite is not None:
                 blit_center(layer, sprite, center, 170)
         else:
-            for index in range(7):
+            for index in range(9):
                 tail = pygame.Vector2(center) - direction.rotate((index - 3) * 6) * projectile.radius * (0.9 + index * 0.24)
-                pygame.draw.circle(layer, (95, 242, 104, 150 - index * 13), (round(tail.x), round(tail.y)), max(3, projectile.radius // 4))
+                pygame.draw.circle(layer, (64, 226, 72, max(48, 172 - index * 12)), (round(tail.x), round(tail.y)), max(4, projectile.radius // 4))
             points = []
             for index, angle in enumerate([0, 42, 108, 184, 246, 315]):
                 scale = 0.72 + ((index * 29 + projectile.frames_left) % 6) * 0.07
                 offset = pygame.Vector2(1, 0).rotate(angle) * projectile.radius * scale
                 points.append((round(center[0] + offset.x), round(center[1] + offset.y)))
-            pygame.draw.polygon(layer, (70, 198, 78, 235), points)
-            pygame.draw.circle(layer, (112, 244, 100, 230), center, round(projectile.radius * 0.7))
+            pygame.draw.polygon(layer, (42, 178, 54, 242), points)
+            pygame.draw.circle(layer, (98, 250, 86, 238), center, round(projectile.radius * 0.76))
             pygame.draw.circle(layer, (214, 255, 186, 215), (center[0] - 4, center[1] - 4), max(4, projectile.radius // 3))
             sprite = load_skill_effect_sprite("wasabi", projectile.radius * 3)
             if sprite is not None:
@@ -1462,8 +1472,8 @@ def draw_cheese_patches(surface: pygame.Surface, patches: list[CheesePatch], lef
         pygame.draw.circle(cheese, (255, 248, 177, 215), (center[0] - round(base_radius * 0.28), center[1] - round(base_radius * 0.24)), max(6, round(base_radius * 0.22)))
         for angle, length_scale in [(75, 0.72), (130, 0.56), (250, 0.64)]:
             start = pygame.Vector2(center) + pygame.Vector2(1, 0).rotate(angle + target.visual_angle) * (base_radius * 0.4)
-            end = pygame.Vector2(center) + pygame.Vector2(1, 0).rotate(angle + target.visual_angle) * (base_radius * (1.0 + length_scale))
-            pygame.draw.line(cheese, (255, 210, 50, 222), start, end, max(8, base_radius // 5))
+            end = pygame.Vector2(center) + pygame.Vector2(1, 0).rotate(angle + target.visual_angle) * (base_radius * (1.25 + length_scale))
+            pygame.draw.line(cheese, (255, 202, 34, 232), start, end, max(9, round(base_radius * 0.24)))
             pygame.draw.circle(cheese, (255, 210, 50, 230), (round(end.x), round(end.y)), max(6, base_radius // 7))
         surface.blit(cheese, (0, 0))
 
@@ -1729,7 +1739,7 @@ def update_duel_ball(
             effects.append(DuelEffect("charge", ball.position.copy(), 28, duel_attack_color("sushi"), ""))
             audio_events.append(AudioEvent(frame_index, "roll_start"))
         elif skill == "heal":
-            healed = min(44, ball.max_hp - ball.hp)
+            healed = min(20, ball.max_hp - ball.hp)
             if healed > 0:
                 ball.hp += healed
                 effects.append(DuelEffect("heal", ball.position.copy(), 42, (144, 238, 204), f"+{healed} FRESH HEAL"))
@@ -1759,6 +1769,22 @@ def update_duel_ball(
 
     movement_scale = 0.55 if ball.slow_frames > 0 else 1.0
     ball.position += ball.velocity * movement_scale / FPS
+    arena_center = pygame.Vector2(arena_rect.center)
+    to_center = arena_center - ball.position
+    if ball.velocity.length_squared() > 0 and to_center.length_squared() > 0:
+        distance_ratio = to_center.length() / max(1, arena_rect.width * 0.5)
+        edge_margin = min(
+            ball.position.x - arena_rect.left,
+            arena_rect.right - ball.position.x,
+            ball.position.y - arena_rect.top,
+            arena_rect.bottom - ball.position.y,
+        )
+        if (ball.skin == "sushi" and distance_ratio > 0.5) or edge_margin < ball.radius * 1.55:
+            turn_strength = 0.014 if ball.skin == "sushi" else 0.007
+            if edge_margin < ball.radius * 1.2:
+                turn_strength *= 1.55
+            current_speed = ball.velocity.length()
+            ball.velocity = ball.velocity.lerp(to_center.normalize() * current_speed, min(0.12, turn_strength))
     if ball.velocity.length_squared() > 0:
         ball.visual_angle = ball.velocity.as_polar()[1] + 90
         if ball.skin == "sushi" and ball.charge_frames > 0:
@@ -1820,7 +1846,7 @@ def fire_cheese_projectile(
     attacker.cheese_spent += 1
     if attacker.cheese_spent >= 4:
         attacker.reload_frames = FPS * 3
-    attacker.skill_cooldown = 72
+    attacker.skill_cooldown = 90
     effects.append(DuelEffect("cheese", start.copy(), 24, (255, 228, 82), "CHEESE SHOT"))
     audio_events.append(AudioEvent(frame_index, "cheese_shot"))
 
@@ -2101,7 +2127,17 @@ def draw_duel_result(
 
     headline_font = make_font(118, bold=True, italic=True)
     result_font = make_font(50, bold=True)
-    draw_text_with_shadow(surface, headline_font, f"{winner.name} WINS!", (WIDTH // 2, round(HEIGHT * 0.24)), duel_attack_color(winner.skin))
+    if progress < 0.42:
+        hit_pulse = 1 + math.sin(frame_index * 0.45) * 0.08
+        draw_text_with_shadow(
+            surface,
+            make_font(round(110 * hit_pulse), bold=True, italic=True),
+            "FINAL HIT!",
+            (WIDTH // 2, round(HEIGHT * 0.235)),
+            (255, 245, 230),
+        )
+    else:
+        draw_text_with_shadow(surface, headline_font, f"{winner.name} WINS!", (WIDTH // 2, round(HEIGHT * 0.24)), duel_attack_color(winner.skin))
     draw_text_with_shadow(surface, result_font, "THIS FOOD WINS", (WIDTH // 2, round(HEIGHT * 0.68)), (255, 245, 230))
     draw_text_with_shadow(surface, result_font, f"Damage {winner.total_damage_dealt}  Hits {winner.hits}", (WIDTH // 2, round(HEIGHT * 0.74)), (220, 232, 255))
     draw_text_with_shadow(
@@ -2311,8 +2347,9 @@ def run_food_duel(
                     dynamic_popup_font = make_font(max(28, round(50 * popup.scale)), bold=True, italic=True)
                     draw_text_with_shadow(render_surface, dynamic_popup_font, f"-{popup.amount}", center, popup.color)
                     if popup.label:
-                        label_font = make_font(round(28 * popup.scale), bold=True, italic=True)
-                        draw_text_with_shadow(render_surface, label_font, popup.label, (center[0], center[1] - round(42 * popup.scale)), popup.color)
+                        label_font = make_font(round((38 if popup.amount >= 50 else 28) * popup.scale), bold=True, italic=True)
+                        label_position = (WIDTH // 2, round(HEIGHT * 0.36 - progress * 58)) if popup.amount >= 50 else (center[0], center[1] - round(42 * popup.scale))
+                        draw_text_with_shadow(render_surface, label_font, popup.label, label_position, popup.color)
                     popup.frames_left -= 1
                 popups = [popup for popup in popups if popup.frames_left > 0]
                 for effect in duel_effects:

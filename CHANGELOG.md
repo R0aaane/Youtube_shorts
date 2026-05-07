@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## 0.20.3 - 2026-05-08
+
+### Changed
+
+- Added a light center-bias movement correction so Sushi spends less time fighting at the arena edge without changing the wooden-board layout.
+- Raised skill/status labels, changed the reload callout to `RELOAD`, and enlarged endgame alerts and 50+ damage critical callouts.
+- Strengthened cheese string trails, wasabi lingering particles, soy splash droplets, and Fresh Heal rings/sparkles.
+- Updated the result screen flow so `FINAL HIT!` appears before the winner headline.
+- Tuned the default food duel cheese damage so the generated duel stays near the existing 29-second pacing.
+
+## 0.20.2 - 2026-05-08
+
+### Changed
+
+- Changed generated YouTube descriptions to use only the required Shorts hashtag line: `#shorts #FoodBattle #PhysicsSimulation #BattleSimulation #satisfying`.
+- Normalized descriptions during YouTube upload so older metadata files do not publish winner, HP, damage, or elapsed-time summaries.
+- Updated upload documentation for the required Shorts description policy.
+
 ## 0.20.1 - 2026-05-08
 
 ### Added

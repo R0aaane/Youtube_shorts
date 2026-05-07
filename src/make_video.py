@@ -21,6 +21,7 @@ DEFAULT_OUTPUT_NAME = "simulation_001"
 DEFAULT_FPS = 60
 DEFAULT_WIDTH = 1080
 DEFAULT_HEIGHT = 1920
+SHORTS_DESCRIPTION = "#shorts #FoodBattle #PhysicsSimulation #BattleSimulation #satisfying"
 
 
 def ensure_ffmpeg() -> str:
@@ -178,21 +179,9 @@ def build_title(config: dict, result: dict) -> str:
 
 def write_youtube_metadata(config: dict, config_path: Path | None, video_path: Path) -> Path:
     result = load_result()
-    status = result.get("status", "UNKNOWN")
-    total_damage = result.get("total_damage", 0)
-    boss_hp_end = result.get("boss_hp_end", config["boss_hp"])
 
     if config.get("theme") == "food_duel":
-        left = result.get("left", {})
-        right = result.get("right", {})
-        left_food = str(config.get("duel_left_food", "pizza")).title()
-        right_food = str(config.get("duel_right_food", "burger")).title()
-        description = (
-            f"{left_food} and {right_food} fight one-on-one with unique skills. "
-            f"Winner: {result.get('winner', 'UNKNOWN')}. "
-            f"{left.get('name', 'LEFT')} HP: {left.get('hp_end', 'N/A')}. "
-            f"{right.get('name', 'RIGHT')} HP: {right.get('hp_end', 'N/A')}. #shorts"
-        )
+        description = SHORTS_DESCRIPTION
         tags = [
             "shorts",
             "food",
@@ -207,11 +196,7 @@ def write_youtube_metadata(config: dict, config_path: Path | None, video_path: P
             "satisfying",
         ]
     elif config.get("theme") == "food_boss":
-        description = (
-            f"{config['initial_ball_count']} pizza, burger, sushi, taco, donut, and fries balls "
-            f"bounce through a food-themed physics battle against a {config['boss_hp']:,} HP boss. "
-            f"Result: {status}. Total damage: {total_damage}. Remaining HP: {boss_hp_end}. #shorts"
-        )
+        description = SHORTS_DESCRIPTION
         tags = [
             "shorts",
             "food",
@@ -226,11 +211,7 @@ def write_youtube_metadata(config: dict, config_path: Path | None, video_path: P
             "satisfying",
         ]
     else:
-        description = (
-            f"{config['initial_ball_count']} evolving physics balls battle a "
-            f"{config['boss_hp']:,} HP wall. Result: {status}. "
-            f"Total damage: {total_damage}. Remaining HP: {boss_hp_end}. #shorts"
-        )
+        description = SHORTS_DESCRIPTION
         tags = [
             "shorts",
             "physics simulation",

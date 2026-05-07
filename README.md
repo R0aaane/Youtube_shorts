@@ -142,7 +142,8 @@ The default duel config uses `duration_seconds` only as an initial layout/progre
 Food duel uses realistic generated food sprites from `assets/food_sprites/`, including Burger and Pizza state variants, with subtle glow and shadow so the characters stand out from the simplified arena. Collision remains circle-based internally, but the visible objects are the food sprites. Heavy hits trigger hit-stop, screen shake, and larger shockwave effects.
 Damage text scales by damage amount: small ticks stay short and compact, medium hits use the standard popup, strong hits add larger text, and only strong hits show shockwaves. 50+ damage shows an extra `CRITICAL!` callout. Sticky cheese is drawn on top of the target food sprite as melted cheese so the ongoing Pizza effect is visible. Pizza loses visible cheese as it fires and reloads its cheese over about 3 seconds when empty.
 Food duel visuals keep the simple wooden-board style, but add stronger character glow, subtle board depth, center emphasis, food-like hit particles, animated skill labels, and brief flashes on large impacts.
-Pizza and Burger show a `Reloading...` label while their cheese or ingredients are being restored.
+Pizza and Burger show a `RELOAD` label while their cheese or ingredients are being restored.
+Food duel finish polish keeps Sushi from drifting too far to the edges, raises skill labels above the characters, shortens reload callouts to `RELOAD`, strengthens cheese strings, wasabi/soy/heal readability, and shows `FINAL HIT!` before the winner headline.
 The duel intro is shortened for Shorts retention: READY lasts under half a second, FIGHT starts quickly, and the default starting positions force the first skill and hit in the opening second. The main food sprites and HUD HP bars are sized for smartphone viewing.
 Food duel no longer ends by the configured 20-second limit. It keeps rendering until one side reaches 0 HP, then writes the 3-second result screen.
 SUSHI is available as a technical duel character. The default food duel config uses `PIZZA vs SUSHI`; Sushi has a larger photoreal salmon nigiri sprite and cycles through visually distinct `WASABI SHOT`, `SOY SPLASH`, `ROLL DASH`, and `FRESH HEAL` effects. Wasabi uses green blobs, trails, splash, and DOT particles; Soy uses translucent brown droplets and slow rings; Roll Dash uses fast spin, pale speed lines, and a larger impact ring; Fresh Heal uses aqua rings, bubbles, and a visible heal callout.
@@ -240,7 +241,13 @@ The metadata includes:
 - `boss_hp`
 - `initial_ball_count`
 
-The title is generated in English for Shorts, the description includes `#shorts`, and `tags` is a JSON array. This metadata is only saved locally; YouTube upload is not implemented.
+The title is generated in English for Shorts, and `tags` is a JSON array. The generated YouTube description is kept short and always uses:
+
+```text
+#shorts #FoodBattle #PhysicsSimulation #BattleSimulation #satisfying
+```
+
+Winner names, HP values, damage totals, and elapsed time are kept out of the public description.
 
 ## YouTube Upload
 
@@ -290,7 +297,7 @@ To upload as `unlisted` or `public`, you must explicitly choose it:
 python src/upload_youtube.py --metadata output/metadata/simulation_001.json --privacy unlisted
 ```
 
-The script sends `title`, `description`, and `tags` from the metadata JSON to YouTube.
+The script sends `title`, `description`, and `tags` to YouTube. During upload, the description is normalized to the required Shorts hashtag line above, even when an older metadata JSON contains a longer result summary.
 
 ## Current Scope
 
