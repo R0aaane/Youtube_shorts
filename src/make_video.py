@@ -185,9 +185,10 @@ def write_youtube_metadata(config: dict, config_path: Path | None, video_path: P
     if config.get("theme") == "food_duel":
         left = result.get("left", {})
         right = result.get("right", {})
+        left_food = str(config.get("duel_left_food", "pizza")).title()
+        right_food = str(config.get("duel_right_food", "burger")).title()
         description = (
-            f"{str(config.get('duel_left_food', 'pizza')).title()} and "
-            f"{str(config.get('duel_right_food', 'burger')).title()} fight one-on-one with unique skills. "
+            f"{left_food} and {right_food} fight one-on-one with unique skills. "
             f"Winner: {result.get('winner', 'UNKNOWN')}. "
             f"{left.get('name', 'LEFT')} HP: {left.get('hp_end', 'N/A')}. "
             f"{right.get('name', 'RIGHT')} HP: {right.get('hp_end', 'N/A')}. #shorts"
@@ -195,8 +196,8 @@ def write_youtube_metadata(config: dict, config_path: Path | None, video_path: P
         tags = [
             "shorts",
             "food",
-            "pizza",
-            "burger",
+            str(config.get("duel_left_food", "pizza")),
+            str(config.get("duel_right_food", "burger")),
             "versus",
             "physics simulation",
             "2d physics",

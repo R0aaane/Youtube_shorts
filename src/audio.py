@@ -234,6 +234,18 @@ def add_event_sound(samples: list[float], kind: str, seconds: float) -> None:
         add_tone(samples, seconds, 0.18, 118, 0.09)
     elif kind == "charge_hit":
         add_sub_bass_hit(samples, seconds, volume=0.34)
+    elif kind == "sushi_shot":
+        add_noise_hit(samples, seconds, 0.1, 0.08, seed=4411, lowpass=0.48)
+        add_swept_tone(samples, seconds + 0.01, 0.12, 420, 250, 0.055)
+    elif kind == "sushi_hit":
+        add_splat(samples, seconds, volume=0.12)
+        add_sizzle(samples, seconds + 0.025, volume=0.045)
+    elif kind == "soy_splash":
+        add_wet_splat(samples, seconds, volume=0.13)
+        add_tone(samples, seconds + 0.03, 0.12, 118, 0.035)
+    elif kind == "heal":
+        add_crunch(samples, seconds, volume=0.055)
+        add_tone(samples, seconds + 0.02, 0.18, 620, 0.05)
     elif kind in {"victory", "win"}:
         add_kitchen_ding(samples, seconds)
 

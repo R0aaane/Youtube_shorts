@@ -145,6 +145,7 @@ Food duel visuals keep the simple wooden-board style, but add stronger character
 Pizza and Burger show a `Reloading...` label while their cheese or ingredients are being restored.
 The duel intro is shortened for Shorts retention: READY lasts under half a second, FIGHT starts quickly, and the default starting positions force the first skill and hit in the opening second. The main food sprites and HUD HP bars are sized for smartphone viewing.
 Food duel no longer ends by the configured 20-second limit. It keeps rendering until one side reaches 0 HP, then writes the 3-second result screen.
+SUSHI is available as a technical duel character. The default food duel config uses `PIZZA vs SUSHI`; Sushi has a salmon nigiri sprite and cycles through `WASABI SHOT`, `SOY SPLASH`, `ROLL DASH`, and `FRESH HEAL`.
 
 ## Launcher UI
 

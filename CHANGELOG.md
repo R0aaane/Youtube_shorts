@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## 0.19.0 - 2026-05-08
+
+### Added
+
+- Added SUSHI as a technical food duel character with a transparent salmon nigiri sprite.
+- Added Sushi skills: `WASABI SHOT`, `SOY SPLASH`, `ROLL DASH`, and `FRESH HEAL`.
+- Added Sushi projectile/status audio cues and a default `PIZZA vs SUSHI` duel config.
+
+### Changed
+
+- Updated food duel metadata text and tags to use the configured duel foods.
+- Updated tests and documentation for the Sushi duel character.
+
 ## 0.18.2 - 2026-05-08
 
 ### Changed
