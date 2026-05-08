@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## 0.21.3 - 2026-05-08
+
+### Changed
+
+- Increased Pizza and Ice Cream sprite presence with stronger glow, outline, hit flash, and brief hit jitter.
+- Strengthened Pizza cheese visuals with longer sticky trails, larger splashes, and clearer cheese pool shapes.
+- Strengthened Ice Cream freeze visuals with larger icy shards, cold trails, frost rings, and `FROZEN` status styling.
+- Improved Shorts readability for low damage, critical damage, endgame warning rings, red edge danger flashes, and the duel intro title/rule text.
+- Added a one-time `FINAL PHASE` callout and stronger final-hit shake/hit-stop timing.
+- Tuned the default Food Duel damage values so Pizza vs Ice Cream resolves closer to the Shorts-friendly 20-25 second range.
+
+## 0.21.2 - 2026-05-08
+
+### Added
+
+- Added four consumed Ice Cream sprite variants that show the scoops being eaten away after repeated `FREEZE SHOT` use.
+
+### Changed
+
+- Ice Cream now spends one visible scoop stage per `FREEZE SHOT` and enters a 3-second `RELOAD` once all scoop stages are spent.
+- Ice Cream reload now restores the visible scoop stages step by step, matching Pizza and Burger resource reload behavior.
+
 ## 0.21.1 - 2026-05-08
 
 ### Changed
